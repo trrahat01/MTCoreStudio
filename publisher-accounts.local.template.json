@@ -1,0 +1,17 @@
+{
+  "warning": "Local organizing template only. This file is not encrypted and is not included in the website export. Do not add AdMob account IDs, login details, tax or payment information, or other confidential records.",
+  "accounts": [
+    {
+      "label": "Publisher Account A",
+      "associatedApps": [],
+      "packageNames": [],
+      "notes": []
+    },
+    {
+      "label": "Publisher Account B",
+      "associatedApps": [],
+      "packageNames": [],
+      "notes": []
+    }
+  ]
+}
