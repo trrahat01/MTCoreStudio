@@ -404,7 +404,7 @@ importers:
         specifier: 'catalog:'
         version: 3.25.76
 
-  artifacts/mt-core-labs:
+  artifacts/mt-core-studio:
     devDependencies:
       '@hookform/resolvers':
         specifier: ^3.10.0

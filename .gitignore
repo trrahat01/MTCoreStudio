@@ -47,3 +47,18 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Local-only tooling / downloads (never committed)
+mkl/
+
+# Local sandbox / probe artifacts (never committed)
+_t.err
+_t.log
+probe-*.log
+probe-*.log.err
+
+# Design sandbox (local prototyping only)
+artifacts/mockup-sandbox/
+
+# Old brand folder (kept only as history)
+artifacts/mt-core-labs/

@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/mt-core-studio/"
+title = "MT Core Studio"
+description = "A lightweight company and app portfolio for MT Core Studio, showcasing Android apps, publisher information, developer profile, news, and support with an InfinityFree-ready static build."
+version = "1.0.0"
+id = "artifacts/mt-core-studio"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/mt-core-studio/" ]
+localPort = 22507
+
+[services.development]
+run = "pnpm --filter @workspace/mt-core-studio run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/mt-core-studio", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/mt-core-studio/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22507"
+BASE_PATH = "/mt-core-studio/"

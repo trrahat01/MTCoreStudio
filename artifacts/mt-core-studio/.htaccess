@@ -1,0 +1,30 @@
+# ---------------------------------------------------------------------------
+# MT Core Studio - site root Apache config (InfinityFree safe)
+# ---------------------------------------------------------------------------
+
+# Never list directory contents.
+Options -Indexes
+
+# Keep the server-managed data files out of direct browser reach.
+# These files are read/written by PHP (api/ and admin/) and are never
+# needed by the public pages, so their contents stay private.
+<FilesMatch "^(visits|waitlist)\.js$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+
+# Hidden files (e.g. the rate-limit log) must never be downloadable.
+<FilesMatch "^\.">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
