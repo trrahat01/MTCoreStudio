@@ -14,6 +14,7 @@ import { apps } from "../data/apps.js";
 import { posts } from "../data/posts.js";
 import { siteConfig } from "../data/site-config.js";
 import { changelog } from "../data/changelog.js";
+import { appPolicies } from "../data/policies.js";
 
 const logo = "assets/images/mt-core-studio-logo.png";
 const pageName = document.body.dataset.page || "home";
@@ -40,6 +41,15 @@ const cleanUrl = (value = "") => {
     return "";
   }
 };
+
+// Per-app privacy policies are authored (HTML) through the /admin console and
+// stored in data/policies.js. This sanitizer keeps the rendered output free of
+// <script> blocks and inline event handlers as a safety net.
+const sanitizePolicyHTML = (html = "") =>
+  String(html)
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/\s+on[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/\s*(?:href|src)\s*=\s*["']?\s*javascript:[^"'\s>]*/gi, "");
 
 
 // Filter list = "All" + every category used by the apps, keeping a familiar
@@ -702,6 +712,24 @@ function appPrivacyPage() {
   document.querySelector('meta[property="og:url"]')?.setAttribute("content", policyUrl);
   document.querySelector('meta[property="og:title"]')?.setAttribute("content", `Privacy policy for ${app.name}`);
 
+  const policy = (appPolicies && typeof appPolicies === "object" && appPolicies[app.id]) || null;
+  const policyHTML = policy ? String(policy.content || "").trim() : "";
+  const policyReady = policyHTML !== "";
+  const policyMeta = policyReady
+    ? `<p class="policy-meta" style="margin-top:8px;font-size:13px;color:var(--muted)">Last updated <time>${escapeHTML(policy.updated || "")}</time> · ${policy.status === "completed" ? "Completed policy" : "Draft policy"}</p>`
+    : "";
+  const draftNotice = !policyReady || policy.status !== "completed"
+    ? `<div class="notice"><strong>Policy in progress:</strong> This policy is finalised before the app is published. Nothing below claims a specific data practice until it matches the actual app.</div>`
+    : `<div class="notice"><strong>Completed policy:</strong> This is the current policy linked from ${escapeHTML(app.name)} on Google Play.</div>`;
+  const policyBody = policyReady
+    ? sanitizePolicyHTML(policyHTML)
+    : `<section class="detail-block"><h2>Policy owner &amp; contact</h2><p><strong>${escapeHTML(app.name)}</strong> is developed and published by MT Core Studio${siteConfig.country ? ` (${escapeHTML(siteConfig.country)})` : ""}. Privacy questions are handled through the public <a class="text-link" href="contact.html">contact page</a>. [The confirmed effective date and a monitored privacy email are added here before publication.]</p></section>
+      <section class="detail-block"><h2>Information this app handles</h2><p>[A per-app list of every category of personal or device information the app collects, its purpose, and whether providing it is optional or required is completed here before publication.]</p></section>
+      <section class="detail-block"><h2>Sharing &amp; service providers</h2><p>[Any SDKs, analytics, advertising or infrastructure providers and their roles are identified here, each linked to its current policy.]</p></section>
+      <section class="detail-block"><h2>Storage, security &amp; retention</h2><p>[Retention periods, security practices and any cross-border handling are described here in accurate general terms.]</p></section>
+      <section class="detail-block"><h2>Children, choices &amp; rights</h2><p>[Age requirements, the controls available to users, and how someone can exercise deletion or other data rights are described here.]</p></section>
+      <section class="detail-block"><h2>Changes to this policy</h2><p>[How updates to this policy are communicated and its version history are noted here.]</p></section>`;
+
   return `<section class="page-intro"><div class="wrap">
     <span class="eyebrow">APP PRIVACY POLICY</span>
     <h1>${escapeHTML(app.name)} — privacy, plainly.</h1>
@@ -709,16 +737,12 @@ function appPrivacyPage() {
   </div></section>
   <section class="content-section"><div class="wrap">
     ${breadcrumbs([["Home", "index.html"], ["Privacy", "privacy.html"], [app.name, ""]])}
-    <div class="notice"><strong>Policy in progress:</strong> This policy is finalised before the app is published. Nothing below claims a specific data practice until it matches the actual app.</div>
+    ${draftNotice}
+    ${policyMeta}
     <article class="detail-copy policy" style="max-width:780px;margin-top:34px">
-      <section class="detail-block"><h2>Policy owner &amp; contact</h2><p><strong>${escapeHTML(app.name)}</strong> is developed and published by MT Core Studio${siteConfig.country ? ` (${escapeHTML(siteConfig.country)})` : ""}. Privacy questions are handled through the public <a class="text-link" href="contact.html">contact page</a>. [The confirmed effective date and a monitored privacy email are added here before publication.]</p></section>
-      <section class="detail-block"><h2>Information this app handles</h2><p>[A per-app list of every category of personal or device information the app collects, its purpose, and whether providing it is optional or required is completed here before publication.]</p></section>
-      <section class="detail-block"><h2>Sharing &amp; service providers</h2><p>[Any SDKs, analytics, advertising or infrastructure providers and their roles are identified here, each linked to its current policy.]</p></section>
-      <section class="detail-block"><h2>Storage, security &amp; retention</h2><p>[Retention periods, security practices and any cross-border handling are described here in accurate general terms.]</p></section>
-      <section class="detail-block"><h2>Children, choices &amp; rights</h2><p>[Age requirements, the controls available to users, and how someone can exercise deletion or other data rights are described here.]</p></section>
-      <section class="detail-block"><h2>Changes to this policy</h2><p>[How updates to this policy are communicated and its version history are noted here.]</p></section>
+      ${policyBody}
     </article>
-    <p class="contact-note">This is the working policy template for <strong>${escapeHTML(app.name)}</strong>. The publishing checklist completes every section before the app is listed on Google Play.</p>
+    ${policyReady ? "" : `<p class="contact-note">This is the working policy template for <strong>${escapeHTML(app.name)}</strong>. The publishing checklist completes every section before the app is listed on Google Play.</p>`}
   </div></section>`;
 }
 

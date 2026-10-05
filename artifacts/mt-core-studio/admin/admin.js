@@ -124,7 +124,11 @@
         if (window.confirm('Delete this app permanently?') === true) {
           setStatus($('apps-status'), 'Deleting…');
           api('delete-app', { id: id })
-            .then(function (json) { renderApps(json.apps); setStatus($('apps-status'), 'App deleted.', true); })
+            .then(function (json) {
+              if (siteData) { siteData.apps = json.apps; renderPolicies(json.apps, siteData.policies || {}); renderChecklist(siteData); }
+              renderApps(json.apps);
+              setStatus($('apps-status'), 'App deleted.', true);
+            })
             .catch(function (err) { setStatus($('apps-status'), err.message, false); });
         }
       });
@@ -305,9 +309,13 @@
     if (!MT_LOGGED_IN) return;
 
     api('list').then(function (json) {
+      siteData = json;
       renderApps(json.apps);
       fillSettings(json.config);
       fillAds(json.ads);
+      renderPolicies(json.apps, json.policies || {});
+      renderVerification(json.verification || []);
+      renderChecklist(json);
     }).catch(function (err) {
       setStatus($('apps-status'), err.message, false);
     });
@@ -324,6 +332,7 @@
       setStatus($('save-status'), 'Saving…');
       api('save-app', collectAppForm())
         .then(function (json) {
+          if (siteData) { siteData.apps = json.apps; renderPolicies(json.apps, siteData.policies || {}); renderChecklist(siteData); }
           renderApps(json.apps);
           $('editor').hidden = true;
           setStatus($('apps-status'), 'App saved. It is live on the website now.', true);
@@ -451,7 +460,296 @@
     }
   }
 
+  /* ------------------------- store & verification ------------------------- */
+
+  var siteData = null;
+
+  // Default policy skeleton, matching the public page template styling.
+  var POLICY_TEMPLATE = [
+    '<section class="detail-block"><h2>Policy owner &amp; contact</h2><p><strong>APP NAME</strong> is developed and published by MT Core Studio. Privacy questions are handled through the public <a class="text-link" href="contact.html">contact page</a>, or by email to the address listed there. This policy is effective as of [DATE].</p></section>',
+    '<section class="detail-block"><h2>Information this app handles</h2><p>[List every category of personal or device information the app collects, its purpose, and whether providing it is optional or required.]</p></section>',
+    '<section class="detail-block"><h2>Sharing &amp; service providers</h2><p>[Identify any SDKs, analytics, advertising or infrastructure providers and their roles, each linked to its current policy.]</p></section>',
+    '<section class="detail-block"><h2>Storage, security &amp; retention</h2><p>[Describe retention periods, security practices and any cross-border handling in accurate general terms.]</p></section>',
+    '<section class="detail-block"><h2>Children, choices &amp; rights</h2><p>[Describe age requirements, the controls available to users, and how deletion or other data rights can be exercised.]</p></section>',
+    '<section class="detail-block"><h2>Changes to this policy</h2><p>[Describe how updates to this policy are communicated and note the version history.]</p></section>'
+  ].join('\n');
+
+  function currentAppName(id) {
+    if (!siteData || !siteData.apps) return '';
+    var match = siteData.apps.find(function (a) { return String(a.id) === String(id); });
+    return match ? String(match.name || '') : '';
+  }
+
+  function policyPublicUrl(id) {
+    var domain = '';
+    if (siteData && siteData.config && siteData.config.canonicalDomain) {
+      domain = String(siteData.config.canonicalDomain).replace(/\/+$/, '');
+    } else {
+      domain = String(window.location.origin || window.location.href).replace(/\/admin\/?$/, '');
+    }
+    return domain + '/app-privacy.html?id=' + encodeURIComponent(String(id));
+  }
+
+  function copyText(text, statusEl, okMsg) {
+    function fallback() {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      try {
+        ta.select();
+        document.execCommand('copy');
+        setStatus(statusEl, okMsg, true);
+      } catch (e2) {
+        setStatus(statusEl, text, false);
+      }
+      ta.remove();
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () {
+        setStatus(statusEl, okMsg, true);
+      }).catch(fallback);
+    } else {
+      fallback();
+    }
+  }
+
+  function policyState(policy) {
+    if (!policy) return { cls: 'bad', label: 'Not written' };
+    var content = String(policy.content || '').trim();
+    if (!content) return { cls: 'bad', label: 'Not written' };
+    return String(policy.status || '').toLowerCase() === 'completed'
+      ? { cls: 'ok', label: 'Completed' }
+      : { cls: 'warn', label: 'Draft' };
+  }
+
+  function renderPolicies(apps, policies) {
+    var el = $('policies-list');
+    if (!el) return;
+    if (!apps || !apps.length) {
+      el.innerHTML = '<p class="muted">Add an app first — each app needs its own policy before it can be listed on Google Play.</p>';
+      return;
+    }
+    el.innerHTML = '<div class="policy-table"><div class="policy-row policy-head"><span>App</span><span>Policy</span><span>Actions</span></div>' +
+      apps.map(function (app) {
+        var id = String(app.id || '');
+        var st = policyState(policies && policies[id]);
+        return '<div class="policy-row">' +
+          '<span><strong>' + esc(String(app.name || id)) + '</strong><br><span class="muted">' + esc(id) + '</span></span>' +
+          '<span><span class="pill pill-' + st.cls + '">' + st.label + '</span></span>' +
+          '<span class="policy-actions">' +
+            '<button class="btn btn-sm" type="button" data-act="edit-policy" data-id="' + escAttr(id) + '">Edit</button>' +
+            '<button class="btn btn-sm" type="button" data-act="copy-policy" data-id="' + escAttr(id) + '">Copy URL</button>' +
+            '<button class="btn btn-sm" type="button" data-act="open-policy" data-id="' + escAttr(id) + '">View ↗</button>' +
+          '</span></div>';
+      }).join('') + '</div>';
+
+    el.querySelectorAll('button[data-act="edit-policy"]').forEach(function (btn) {
+      btn.addEventListener('click', function () { openPolicyEditor(btn.getAttribute('data-id')); });
+    });
+    el.querySelectorAll('button[data-act="copy-policy"]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        copyText(policyPublicUrl(btn.getAttribute('data-id')), $('policies-status'), 'Privacy policy URL copied — paste it into the Play Console when it asks for a Privacy Policy URL.');
+      });
+    });
+    el.querySelectorAll('button[data-act="open-policy"]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var w = window.open(policyPublicUrl(btn.getAttribute('data-id')), '_blank', 'noopener');
+        if (w) w.opener = null;
+      });
+    });
+  }
+
+  function fillPolicySelect(selected) {
+    var sel = $('pol-app');
+    if (!sel) return;
+    var apps = siteData && siteData.apps ? siteData.apps : [];
+    sel.innerHTML = apps.map(function (app) {
+      return '<option value="' + escAttr(String(app.id || '')) + '">' + esc(String(app.name || app.id || '')) + '</option>';
+    }).join('');
+    if (selected && apps.some(function (a) { return String(a.id) === String(selected); })) {
+      sel.value = String(selected);
+    }
+  }
+
+  function openPolicyEditor(id) {
+    if (!siteData) return;
+    var editor = $('policy-editor');
+    editor.hidden = false;
+    editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    fillPolicySelect(id);
+    var policy = (siteData.policies && siteData.policies[id]) || {};
+    $('pol-status').value = String(policy.status || 'draft') === 'completed' ? 'completed' : 'draft';
+    $('pol-content').value = String(policy.content || '');
+    $('pol-updated').textContent = policy.updated ? String(policy.updated) : 'not saved yet';
+    setStatus($('pol-status-msg'), '');
+    $('policy-editor-title').textContent = 'Privacy policy — ' + (currentAppName(id) || id);
+    $('pol-content').focus();
+  }
+
+  function renderVerification(files) {
+    var el = $('verification-list');
+    if (!el) return;
+    if (!files || !files.length) {
+      el.innerHTML = '<p class="muted">No Google Play verification files hosted yet. Add the file name and content from the Play Console below.</p>';
+      return;
+    }
+    var domain = '';
+    if (siteData && siteData.config && siteData.config.canonicalDomain) {
+      domain = String(siteData.config.canonicalDomain).replace(/\/+$/, '');
+    }
+    el.innerHTML = files.map(function (f) {
+      var name = String(f.name || '');
+      var url = (domain ? domain : '') + '/' + name;
+      var meta = esc(String(f.modified || '') + (f.size ? ' · ' + f.size + ' B' : ''));
+      return '<div class="file-row">' +
+        '<span><strong>' + esc(name) + '</strong><br><span class="muted">' + meta + '</span></span>' +
+        '<span><code>' + esc(url) + '</code></span>' +
+        '<span class="file-actions">' +
+          '<button class="btn btn-sm" type="button" data-act="copy-vf" data-url="' + escAttr(url) + '">Copy URL</button>' +
+          '<button class="btn btn-sm btn-danger" type="button" data-act="delete-vf" data-name="' + escAttr(name) + '">Delete</button>' +
+        '</span></div>';
+    }).join('');
+
+    el.querySelectorAll('button[data-act="copy-vf"]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        copyText(btn.getAttribute('data-url'), $('verification-status'), 'Verification file URL copied — paste it into the Play Console.');
+      });
+    });
+    el.querySelectorAll('button[data-act="delete-vf"]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var name = btn.getAttribute('data-name');
+        if (!window.confirm('Delete ' + name + ' from the site root? Google may no longer verify the website until you re-add it.')) return;
+        api('delete-verification', { name: name })
+          .then(function (json) {
+            renderVerification(json.verification || []);
+            setStatus($('verification-status'), name + ' deleted.', true);
+          })
+          .catch(function (err) { setStatus($('verification-status'), err.message, false); });
+      });
+    });
+  }
+
+  function renderChecklist(data) {
+    var el = $('checklist-list');
+    if (!el) return;
+    var apps = data && data.apps ? data.apps : [];
+    var config = data && data.config ? data.config : {};
+    var ads = data && data.ads ? data.ads : [];
+    var policies = data && data.policies ? data.policies : {};
+
+    var items = [];
+    function add(ok, label, hint) {
+      items.push('<div class="check-row ' + (ok ? 'ok' : 'bad') + '"><span class="check-mark">' + (ok ? '✓' : '✗') + '</span><span>' +
+        esc(label) + (hint ? '<br><span class="muted">' + esc(hint) + '</span>' : '') + '</span></div>');
+    }
+
+    var domainOk = !!(config.canonicalDomain && !/example\.com/i.test(String(config.canonicalDomain)));
+    add(domainOk, 'A real canonical domain is set', domainOk ? String(config.canonicalDomain) : 'Edit data/site-config.js and replace https://example.com with your domain.');
+    add(!!config.email, 'Contact / support email is set', 'Site settings → Support email.');
+    add(!!config.playStoreUrl, 'Google Play developer page URL is set', 'Site settings → Google Play developer page.');
+    add(ads.length > 0, 'app-ads.txt has at least one publisher line', ads.length + ' line(s) currently.');
+
+    apps.forEach(function (app) {
+      var name = String(app.name || app.id || '');
+      var id = String(app.id || '');
+      var st = policyState(policies[id]);
+      var privacyLinked = !app.privacyUrl || String(app.privacyUrl).indexOf('app-privacy.html') !== -1;
+      add(st.cls !== 'bad', '“' + name + '” has a written privacy policy', st.label + (app.privacyUrl ? ' · linked from the app: ' + String(app.privacyUrl) : ''));
+      add(privacyLinked, '“' + name + '” privacyUrl points to the policy page', 'App editor → Privacy policy URL.');
+      add(!!app.playStoreUrl, '“' + name + '” has a Google Play listing URL', String(app.playStoreUrl || 'Added automatically after publishing.'));
+      add(String(app.status || '').toLowerCase().indexOf('publish') !== -1, '“' + name + '” status is Published', String(app.status || '') + ' — set in the app editor.');
+    });
+
+    el.innerHTML = items.join('') || '<p class="muted">Add your first app to start the checklist.</p>';
+  }
+
+  function wireStoreFeatures() {
+    if (!MT_LOGGED_IN) return;
+
+    /* privacy policy editor */
+    $('btn-pol-close').addEventListener('click', function () { $('policy-editor').hidden = true; });
+
+    $('btn-pol-fill').addEventListener('click', function () {
+      var name = currentAppName($('pol-app').value) || 'This app';
+      $('pol-content').value = POLICY_TEMPLATE.replace(/APP NAME/g, name);
+      setStatus($('pol-status-msg'), 'Default template inserted — replace the [bracketed] parts with real details.', true);
+    });
+
+    $('policy-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var id = $('pol-app').value;
+      if (!id) { setStatus($('pol-status-msg'), 'Choose an app first.', false); return; }
+      setStatus($('pol-status-msg'), 'Saving…');
+      api('save-policy', { id: id, status: $('pol-status').value, content: $('pol-content').value })
+        .then(function (json) {
+          if (siteData) { siteData.policies = json.policies || siteData.policies; renderPolicies(siteData.apps, siteData.policies); renderChecklist(siteData); }
+          $('pol-updated').textContent = new Date().toISOString().slice(0, 10);
+          setStatus($('pol-status-msg'), 'Policy saved — app-privacy.html?id=' + id + ' now shows this content.', true);
+        })
+        .catch(function (err) { setStatus($('pol-status-msg'), err.message, false); });
+    });
+
+    $('btn-pol-remove').addEventListener('click', function () {
+      var id = $('pol-app').value;
+      if (!id) return;
+      if (!window.confirm('Remove the saved policy for this app? The public page will go back to the default draft template.')) return;
+      api('reset-policy', { id: id })
+        .then(function (json) {
+          if (siteData) { siteData.policies = json.policies || {}; renderPolicies(siteData.apps, siteData.policies); renderChecklist(siteData); }
+          $('pol-content').value = '';
+          $('pol-updated').textContent = 'not saved yet';
+          setStatus($('pol-status-msg'), 'Saved policy removed.', true);
+        })
+        .catch(function (err) { setStatus($('pol-status-msg'), err.message, false); });
+    });
+
+    /* AdMob publisher-line helper */
+    $('ads-rel').addEventListener('change', function () {
+      var direct = $('ads-rel').value === 'DIRECT';
+      $('ads-token').disabled = direct;
+      if (direct) $('ads-token').value = 'f08c47fec0942fa0';
+    });
+    $('ads-token').value = 'f08c47fec0942fa0';
+    $('ads-token').disabled = true;
+
+    $('ads-add-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      setStatus($('ads-helper-status'), 'Adding…');
+      api('add-ads-line', {
+        domain: $('ads-domain').value,
+        publisher: $('ads-pub').value,
+        relation: $('ads-rel').value,
+        token: $('ads-token').value
+      }).then(function (json) {
+        fillAds(json.ads || []);
+        $('ads-pub').value = '';
+        setStatus($('ads-helper-status'), 'Publisher line added to app-ads.txt. Check AdMob → Apps → app-ads.txt after 24 hours.', true);
+      }).catch(function (err) { setStatus($('ads-helper-status'), err.message, false); });
+    });
+
+    /* Google Play verification files */
+    $('verification-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var name = $('vf-name').value.trim();
+      if (!/^google[A-Za-z0-9_-]*\.html$/i.test(name)) {
+        setStatus($('vf-status'), 'The file name must look like "google1a2b3c.html" — exactly what the Play Console shows.', false);
+        return;
+      }
+      setStatus($('vf-status'), 'Saving…');
+      api('save-verification', { name: name, content: $('vf-content').value })
+        .then(function (json) {
+          renderVerification(json.verification || []);
+          $('vf-content').value = '';
+          setStatus($('vf-status'), name + ' is now live at the site root.', true);
+        })
+        .catch(function (err) { setStatus($('vf-status'), err.message, false); });
+    });
+  }
+
   wireLogin();
   wireDashboard();
+  wireStoreFeatures();
 })();
 

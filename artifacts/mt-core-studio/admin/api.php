@@ -61,6 +61,8 @@ if ($action === 'list') {
         'apps' => mt_read_apps(),
         'config' => mt_read_config(),
         'ads' => mt_read_ads(),
+        'policies' => mt_read_policies(),
+        'verification' => mt_verification_files(),
         'categories' => ['Productivity', 'Education', 'Lifestyle', 'Entertainment', 'Tools', 'Other'],
     ]);
 }
@@ -207,6 +209,112 @@ if ($action === 'visits-export') {
     header('Content-Disposition: attachment; filename="mt-core-studio-visits.csv"');
     echo "\xEF\xBB\xBF" . $csv;
     exit;
+}
+
+/* ---------------------------- privacy policies ---------------------------- */
+/* Saved per app into data/policies.js; the public privacy page renders the  */
+/* saved policy instead of the default template once content exists.          */
+
+if ($action === 'save-policy') {
+    $id = mt_clean_text($_POST['id'] ?? '', 200);
+    $status = strtolower(mt_clean_text($_POST['status'] ?? 'draft', 20));
+    if ($status !== 'completed') {
+        $status = 'draft';
+    }
+    $content = mt_clean_policy_content((string) ($_POST['content'] ?? ''));
+    if ($id === '') {
+        mt_json(['ok' => false, 'error' => 'App id is required.'], 400);
+    }
+    $policies = mt_read_policies();
+    $policies[$id] = ['updated' => date('Y-m-d'), 'status' => $status, 'content' => $content];
+    if (!mt_write_policies($policies)) {
+        mt_json(['ok' => false, 'error' => 'Could not write data/policies.js. Check that the data folder is writable by PHP.'], 500);
+    }
+    mt_json(['ok' => true, 'policies' => $policies]);
+}
+
+if ($action === 'reset-policy') {
+    $id = mt_clean_text($_POST['id'] ?? '', 200);
+    $policies = mt_read_policies();
+    if ($id !== '' && isset($policies[$id])) {
+        unset($policies[$id]);
+    }
+    if (!mt_write_policies($policies)) {
+        mt_json(['ok' => false, 'error' => 'Could not write data/policies.js. Check file permissions.'], 500);
+    }
+    mt_json(['ok' => true, 'policies' => $policies]);
+}
+
+/* ----------------------------- AdMob app-ads.txt --------------------------- */
+/* Guided helper: builds a valid authorized-sellers line and adds it to        */
+/* app-ads.txt, keeping the raw editor available for power users.              */
+
+if ($action === 'add-ads-line') {
+    $domain = strtolower(mt_clean_text($_POST['domain'] ?? '', 200));
+    $publisherId = mt_clean_text($_POST['publisher'] ?? '', 200);
+    $relation = strtoupper(mt_clean_text($_POST['relation'] ?? 'DIRECT', 20));
+    $token = mt_clean_text($_POST['token'] ?? '', 200);
+    $lines = mt_read_ads();
+
+    if ($domain === '' || stripos($domain, '.') === false) {
+        mt_json(['ok' => false, 'error' => 'Enter the developer website domain shown on your listings, for example "mtcorestudio.com".'], 400);
+    }
+    if (preg_match('/^pub-[0-9]{14,20}$/', $publisherId) !== 1) {
+        mt_json(['ok' => false, 'error' => 'The AdMob publisher ID should look like "pub-1234567890123456" (the pub- number from your AdMob account).'], 400);
+    }
+    if ($relation !== 'DIRECT' && $relation !== 'RESELLER') {
+        $relation = 'DIRECT';
+    }
+    if ($relation === 'DIRECT') {
+        $token = 'f08c47fec0942fa0';
+    }
+    if ($token === '') {
+        mt_json(['ok' => false, 'error' => 'Enter the reseller verification token for RESELLER lines.'], 400);
+    }
+
+    $line = $domain . ', ' . $publisherId . ', ' . $relation . ', ' . $token;
+    $already = false;
+    foreach ($lines as $existing) {
+        if (strtolower($existing) === strtolower($line)) {
+            $already = true;
+            break;
+        }
+    }
+    if (!$already) {
+        $lines[] = $line;
+        if (!mt_write_ads($lines)) {
+            mt_json(['ok' => false, 'error' => 'Could not write app-ads.txt. Check file permissions.'], 500);
+        }
+    }
+    mt_json(['ok' => true, 'ads' => $lines]);
+}
+
+/* ------------------------ Google Play verification files ------------------- */
+
+if ($action === 'save-verification') {
+    $name = mt_clean_text($_POST['name'] ?? '', 200);
+    $content = trim((string) ($_POST['content'] ?? ''));
+    if (!mt_is_verification_file($name)) {
+        mt_json(['ok' => false, 'error' => 'The file name must look like "google1a2b3c.html" — only Google Play verification files can be created here.'], 400);
+    }
+    if (strlen($content) > 20000) {
+        mt_json(['ok' => false, 'error' => 'Verification file content is too large.'], 400);
+    }
+    if (!mt_write_verification_file($name, $content)) {
+        mt_json(['ok' => false, 'error' => 'Could not write the verification file. Check that the site root is writable by PHP.'], 500);
+    }
+    mt_json(['ok' => true, 'verification' => mt_verification_files()]);
+}
+
+if ($action === 'delete-verification') {
+    $name = mt_clean_text($_POST['name'] ?? '', 200);
+    if (!mt_is_verification_file($name)) {
+        mt_json(['ok' => false, 'error' => 'Only Google Play verification files can be removed here.'], 400);
+    }
+    if (!mt_delete_verification_file($name)) {
+        mt_json(['ok' => false, 'error' => 'Could not delete the verification file. Check file permissions.'], 500);
+    }
+    mt_json(['ok' => true, 'verification' => mt_verification_files()]);
 }
 
 mt_json(['ok' => false, 'error' => 'Unknown action.'], 400);

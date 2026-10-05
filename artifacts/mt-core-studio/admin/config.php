@@ -443,6 +443,105 @@ function mt_write_ads(array $lines): bool
         }
     }
     return file_put_contents(mt_ads_path(), $content) !== false;
+}
+
+/* ----------------------------- app privacy policies ----------------------- */
+/* Stored in data/policies.js as `export const appPolicies = {...}`. Written   */
+/* from the admin console; read by the browser on app-privacy.html?id=<app>.  */
+
+function mt_clean_policy_content(string $value, int $max = 60000): string
+{
+    // Trim + byte-truncate WITHOUT collapsing whitespace: policies are
+    // multi-paragraph HTML, so mt_clean_text()'s \s+ collapsing is wrong here.
+    $text = trim((string) $value);
+    if (strlen($text) > $max) {
+        $text = substr($text, 0, $max);
+        // Drop a partial trailing UTF-8 sequence so the result is always
+        // valid UTF-8 (no mbstring extension assumed on the host).
+        while ($text !== '' && (ord($text[strlen($text) - 1]) & 0xC0) === 0x80) {
+            $text = substr($text, 0, -1);
+        }
+    }
+    return $text;
+}
+
+function mt_read_policies(): array
+{
+    $map = mt_read_module('policies.js', 'appPolicies');
+    return is_array($map) ? $map : [];
+}
+
+function mt_write_policies(array $map): bool
+{
+    $header = mt_module_header('policies.js', 'appPolicies');
+    $json = '{}';
+    if (count($map) > 0) {
+        $json = json_encode($map, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        if ($json === false) {
+            return false;
+        }
+    }
+    $content = $header . 'export const appPolicies = ' . $json . ";\n";
+    return file_put_contents(mt_data_path('policies.js'), $content) !== false;
+}
+
+/* ----------------------- Google Play verification files -------------------- */
+/* Play Console hands you a file name such as google1a2b3c.html plus the      */
+/* exact content it must contain. Those files must live at the site root.     */
+
+function mt_is_verification_file(string $name): bool
+{
+    return preg_match('/^google[0-9A-Za-z_-]*\.html$/', $name) === 1;
+}
+
+function mt_verification_files(): array
+{
+    $names = [];
+    $entries = scandir(MT_SITE_ROOT);
+    if (!is_array($entries)) {
+        return [];
+    }
+    foreach ($entries as $name) {
+        if ($name === '.' || $name === '..' || !mt_is_verification_file($name)) {
+            continue;
+        }
+        if (is_file(MT_SITE_ROOT . '/' . $name)) {
+            $names[] = $name;
+        }
+    }
+    arsort($names); // descending; reverse to list alphabetically
+    $out = [];
+    foreach (array_reverse($names) as $name) {
+        $st = stat(MT_SITE_ROOT . '/' . $name);
+        $out[] = [
+            'name' => $name,
+            'size' => is_array($st) ? (int) ($st['size'] ?? 0) : 0,
+            'modified' => is_array($st) ? date('Y-m-d H:i', (int) ($st['mtime'] ?? time())) : '',
+        ];
+    }
+    return $out;
+}
+
+function mt_write_verification_file(string $name, string $content): bool
+{
+    $name = trim($name);
+    if (!mt_is_verification_file($name)) {
+        return false;
+    }
+    return file_put_contents(MT_SITE_ROOT . '/' . $name, $content) !== false;
+}
+
+function mt_delete_verification_file(string $name): bool
+{
+    $name = trim($name);
+    if (!mt_is_verification_file($name)) {
+        return false;
+    }
+    $path = MT_SITE_ROOT . '/' . $name;
+    if (!is_file($path)) {
+        return true; // already gone
+    }
+    return unlink($path) === true;
 }/* ---------------------------- Google Play import -------------------------- */
 
 function mt_http_get(string $url): ?string

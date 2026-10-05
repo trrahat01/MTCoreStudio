@@ -41,9 +41,10 @@ api/waitlist.php    Public waitlist endpoint (needs PHP - included free on Infin
 api/visit.php       Anonymous visit beacon (needs PHP - powers the admin Visitors stats)
 app-ads.txt         AdMob app-ads.txt verification
 .htaccess           Root Apache config (protects data/visits.js + data/waitlist.js)
-admin/              Optional PHP admin console (apps, settings, waitlist, visitors)
+admin/              Optional PHP admin console (apps, settings, waitlist, visitors, privacy policies, App Store verification)
 data/apps.js        ★ App directory data — edit this to add apps
 data/posts.js       Blog posts
+data/policies.js    Per-app privacy policies (written from the admin console, read by app-privacy.html)
 data/changelog.js   Release notes (updates.html + app pages)
 data/waitlist.js    Waitlist emails (written by the waitlist endpoint)
 data/visits.js      Anonymised visit log (written by the visit beacon, read in admin)
@@ -201,8 +202,10 @@ To finish AdMob verification:
 3. Wait at least 24 hours for Google to crawl it (it can take longer).
 4. In AdMob go to Apps -> your app -> app-ads.txt and check the status. You
    can also open https://google.com/adsense/local-ads.txt to see crawled lines.
-5. Need to add another publisher account later? Add one line per account and
-   re-upload, or use the admin console (section 10).
+5. Need to add or remove a publisher account later? Add one line per account
+   and re-upload, or use the **AdMob helper** in the admin console (section 10):
+   enter the publisher ID - it builds the correct line and appends it to
+   app-ads.txt for you.
 
 This file is public by design - it exists exactly so anyone can verify which
 advertising accounts are authorized to sell inventory for the apps.
@@ -223,7 +226,20 @@ Open: https://yourdomain.com/admin/
   downloads the icon into assets/apps/, and fills screenshots.
 - Site settings: email, Google Play developer page, social links, developer
   name, country - writes data/site-config.js.
-- app-ads.txt tab: edit the publisher lines directly and save.
+- app-ads.txt tab: edit the publisher lines directly and save, or use the
+  "Add an AdMob publisher line" helper (domain + pub- ID + DIRECT/RESELLER).
+- Privacy policies (Play Store): write each app's policy in a small HTML
+  editor (or start from the default template). Saved policies are published
+  instantly at app-privacy.html?id=<app-id> - use the "Copy URL" button to
+  paste the exact privacy-policy URL into the Play Console. It also marks the
+  policy Draft / Completed so you know what is ready before you submit.
+- Google Play site verification: when Play Console asks you to verify a
+  website, it gives you a file name like google1a2b3c.html plus its exact
+  content. Add it here and it is hosted immediately at the site root; remove
+  it again once the verification is finished.
+- Launch readiness: a live checklist that flags anything Play Store or AdMob
+  reviewers will look for (real canonical domain, contact email, app-ads.txt,
+  per-app privacy policy + listing URL + Published status).
 
 Hardening: admin/config.php is denied to direct web access by .htaccess, the
 password is hashed, and every write requires a CSRF token. For extra safety
@@ -308,8 +324,11 @@ These ship with the current files - no extra setup needed beyond uploading:
   `data/site-config.js` with numbers you can prove (Play Console), and the
   homepage shows them. It stays hidden until you add them - no invented figures.
 - **Roadmap (About page).** Edit the `roadmap` list in `data/site-config.js`.
-- **Per-app privacy pages.** `app-privacy.html?id=<app-id>` renders a policy
-  template for each app (linked from the app detail page). Complete every
+- **Per-app privacy pages.** `app-privacy.html?id=<app-id>` renders the saved
+  policy for each app when one exists (write it in Admin → Privacy policies),
+  or the built-in working template otherwise. The page is linked from the app
+  detail page, and the "Copy URL" button in admin gives you the exact URL to
+  paste into the Play Console as the app's Privacy Policy. Complete every
   section before the app ships - the template says it is in progress until then.
 - **Breadcrumbs** on app detail and updates pages; dynamic `og:image` per app
   for social sharing.

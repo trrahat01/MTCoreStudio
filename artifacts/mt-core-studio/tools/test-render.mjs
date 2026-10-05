@@ -60,6 +60,10 @@ global.window = {
 
 global.localStorage = { getItem() { return null; }, setItem() {} };
 // navigator is a native global in Node 22+; main.js guards serviceWorker itself.
+// rAF is used by the home page's decorative canvas/mouse-glow loops. Never
+// invoke the callback (the loops self-schedule forever); just satisfy the call.
+global.requestAnimationFrame = () => 0;
+global.cancelAnimationFrame = () => 0;
 
 const cases = [
   { page: "home", search: "", checks: ["feature-band", "app-grid"], absent: ["stats-band"] },
@@ -72,8 +76,8 @@ const cases = [
   { page: "contact", search: "", checks: ["GET IN TOUCH"] },
   { page: "privacy", search: "", checks: ["PRIVACY POLICY"] },
   { page: "blog", search: "", checks: ["Subscribe via RSS", "NOTES FROM THE STUDIO"] },
-  { page: "updates", search: "", checks: ["UPDATES", "No releases listed yet"], absent: ["TypeError"] },
-  { page: "app-privacy", search: "?id=daily-spark", checks: ["privacy, plainly", "Policy in progress", "breadcrumbs"] },
+  { page: "updates", search: "", checks: ["UPDATES", "changelog-list"], absent: ["TypeError"] },
+  { page: "app-privacy", search: "?id=daily-spark", checks: ["privacy, plainly", "breadcrumbs", "detail-copy policy"] },
 ];
 
 let failures = 0;

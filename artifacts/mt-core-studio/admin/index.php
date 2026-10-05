@@ -209,9 +209,37 @@ $host = (string) ($_SERVER['HTTP_HOST'] ?? 'localhost');
 
     <section class="card">
       <div class="card-head">
-        <div><h2>app-ads.txt</h2><p>Used by AdMob to verify your app inventory. Hosted automatically at the site root.</p></div>
+        <div><h2>AdMob &amp; app-ads.txt</h2><p>AdMob verifies you as an authorized seller of your app inventory through this file at the site root. Enter each AdMob publisher ID below, then check AdMob → Apps → app-ads.txt after 24 hours.</p></div>
       </div>
-      <p class="muted">One advertising line per row, for example: <code>google.com, pub-0000000000000000, DIRECT, f08c47fec0942fa0</code><br>
+      <div class="sub-panel">
+        <h3>Add an AdMob publisher line</h3>
+        <form id="ads-add-form" autocomplete="off">
+          <div class="grid">
+            <label>Developer website domain
+              <input type="text" id="ads-domain" placeholder="mtcorestudio.com">
+            </label>
+            <label>AdMob publisher ID
+              <input type="text" id="ads-pub" placeholder="pub-1234567890123456">
+            </label>
+          </div>
+          <div class="grid">
+            <label>Relationship
+              <select id="ads-rel">
+                <option value="DIRECT">DIRECT — you sell your own inventory</option>
+                <option value="RESELLER">RESELLER</option>
+              </select>
+            </label>
+            <label>Reseller token <span class="muted">(auto-filled for DIRECT)</span>
+              <input type="text" id="ads-token" placeholder="f08c47fec0942fa0">
+            </label>
+          </div>
+          <div class="row">
+            <button class="btn btn-primary" type="submit" id="btn-ads-add">Add line</button>
+            <span class="status" id="ads-helper-status"></span>
+          </div>
+        </form>
+      </div>
+      <p class="muted">Or edit the file directly — one advertising line per row, for example: <code>google.com, pub-0000000000000000, DIRECT, f08c47fec0942fa0</code><br>
       Public URL: <code>https://<?php echo htmlspecialchars($host, ENT_QUOTES, 'UTF-8'); ?>/app-ads.txt</code></p>
       <form id="ads-form">
         <label class="sr-only" for="ads-lines">app-ads.txt lines</label>
@@ -221,6 +249,71 @@ $host = (string) ($_SERVER['HTTP_HOST'] ?? 'localhost');
           <span class="status" id="ads-status" role="status"></span>
         </div>
       </form>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <div><h2>Privacy policies <span class="muted">(Play Store)</span></h2><p>Google Play requires every app to have a public privacy-policy URL. Write each policy here — it is published at <code>app-privacy.html?id=&lt;app&gt;</code> and ready to paste into the Play Console.</p></div>
+      </div>
+      <div id="policies-list" class="policy-list" aria-live="polite"></div>
+      <p class="status muted" id="policies-status"></p>
+    </section>
+
+    <section class="card" id="policy-editor" hidden>
+      <div class="card-head">
+        <div><h2 id="policy-editor-title">Edit privacy policy</h2><p>Simple HTML is fine — <code>&lt;h2&gt;</code> for section headings and <code>&lt;p&gt;</code> for paragraphs (the default template matches the site’s policy styling).</p></div>
+      </div>
+      <form id="policy-form" autocomplete="off">
+        <div class="grid">
+          <label>App
+            <select id="pol-app"></select>
+          </label>
+          <label>Status
+            <select id="pol-status">
+              <option value="draft">Draft — still working on it</option>
+              <option value="completed">Completed — ready for Play Store review</option>
+            </select>
+          </label>
+        </div>
+        <label>Policy HTML <span class="muted">· last updated: <span id="pol-updated">—</span></span>
+          <textarea id="pol-content" rows="12" spellcheck="true"></textarea>
+        </label>
+        <div class="row">
+          <button class="btn btn-ghost" type="button" id="btn-pol-fill">Fill with default template</button>
+          <button class="btn btn-primary" type="submit" id="btn-pol-save">Save policy</button>
+          <button class="btn btn-danger" type="button" id="btn-pol-remove">Remove saved policy</button>
+          <button class="btn" type="button" id="btn-pol-close">Close editor</button>
+          <span class="status" id="pol-status-msg" role="status"></span>
+        </div>
+      </form>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <div><h2>Google Play site verification</h2><p>When the Play Console asks you to verify that you own a website, Google provides a file name like <code>google1a2b3c.html</code> with exact content. Add it here to host it instantly at the site root.</p></div>
+      </div>
+      <div id="verification-list" class="file-list" aria-live="polite"></div>
+      <p class="status muted" id="verification-status"></p>
+      <form id="verification-form" autocomplete="off">
+        <label>File name
+          <input type="text" id="vf-name" placeholder="google1a2b3c.html">
+        </label>
+        <label>File content <span class="muted">(paste exactly what Google shows, e.g. <code>google-site-verification: google1a2b3c.html</code>)</span>
+          <textarea id="vf-content" rows="3" placeholder="google-site-verification: google1a2b3c.html"></textarea>
+        </label>
+        <div class="row">
+          <button class="btn btn-primary" type="submit" id="btn-vf-save">Add / update file</button>
+          <span class="status" id="vf-status" role="status"></span>
+        </div>
+      </form>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <div><h2>Launch readiness</h2><p>Everything Google Play and AdMob reviewers look at, checked live against the data you have entered.</p></div>
+      </div>
+      <div id="checklist-list" class="checklist" aria-live="polite"></div>
+      <p class="status muted" id="checklist-status"></p>
     </section>
 
   </main>
