@@ -343,6 +343,14 @@ input::placeholder, textarea::placeholder { color: #5c6f8c; }
   .file-row span:nth-child(3) { grid-column: 1 / -1; }
 }
 
+/* URL copy row (privacy policy editor) */
+.url-copy { display: flex; gap: 8px; align-items: center; }
+.url-copy input { flex: 1; min-width: 0; font-family: Consolas, monospace; font-size: 13px; }
+@media (max-width: 720px) {
+  .url-copy { flex-wrap: wrap; }
+  .url-copy .btn { flex: 1 1 auto; }
+}
+
 /* launch readiness checklist */
 .checklist { margin-top: 6px; }
 .check-row {

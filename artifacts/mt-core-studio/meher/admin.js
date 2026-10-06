@@ -500,14 +500,31 @@
     return match ? String(match.name || '') : '';
   }
 
-  function policyPublicUrl(id) {
-    var domain = '';
-    if (siteData && siteData.config && siteData.config.canonicalDomain) {
-      domain = String(siteData.config.canonicalDomain).replace(/\/+$/, '');
-    } else {
-      domain = String(window.location.origin || window.location.href).replace(/\/admin\/?$/, '');
+  // Real public site root. Prefers the configured canonical domain, but if it is
+  // still the https://example.com placeholder (or missing), uses the origin the
+  // console is actually served from - so the links you copy are always live.
+  function siteRootUrl() {
+    var config = siteData && siteData.config ? siteData.config : {};
+    var canned = String(config.canonicalDomain || '').trim().replace(/\/+$/, '');
+    if (canned && !/example\.com/i.test(canned)) {
+      return canned;
     }
-    return domain + '/app-privacy.html?id=' + encodeURIComponent(String(id));
+    var origin = String(window.location.origin || '').trim();
+    if (origin && origin.indexOf('http') === 0) {
+      return origin.replace(/\/+$/, '');
+    }
+    return '';
+  }
+
+  function policyPublicUrl(id) {
+    return siteRootUrl() + '/app-privacy.html?id=' + encodeURIComponent(String(id));
+  }
+
+  // Keep the read-only URL field in the policy editor in sync with the app selected.
+  function refreshPolicyUrl() {
+    var el = $('pol-url');
+    if (!el) return;
+    el.value = policyPublicUrl($('pol-app').value || '');
   }
 
   function copyText(text, statusEl, okMsg) {
@@ -605,6 +622,7 @@
     $('pol-updated').textContent = policy.updated ? String(policy.updated) : 'not saved yet';
     setStatus($('pol-status-msg'), '');
     $('policy-editor-title').textContent = 'Privacy policy — ' + (currentAppName(id) || id);
+    refreshPolicyUrl();
     $('pol-content').focus();
   }
 
@@ -615,10 +633,7 @@
       el.innerHTML = '<p class="muted">No Google Play verification files hosted yet. Add the file name and content from the Play Console below.</p>';
       return;
     }
-    var domain = '';
-    if (siteData && siteData.config && siteData.config.canonicalDomain) {
-      domain = String(siteData.config.canonicalDomain).replace(/\/+$/, '');
-    }
+    var domain = siteRootUrl();
     el.innerHTML = files.map(function (f) {
       var name = String(f.name || '');
       var url = (domain ? domain : '') + '/' + name;
@@ -691,6 +706,21 @@
     /* privacy policy editor */
     $('btn-pol-close').addEventListener('click', function () { $('policy-editor').hidden = true; });
 
+    if ($('pol-app')) {
+      $('pol-app').addEventListener('change', refreshPolicyUrl);
+    }
+    if ($('btn-pol-copy-url')) {
+      $('btn-pol-copy-url').addEventListener('click', function () {
+        copyText(policyPublicUrl($('pol-app').value || ''), $('pol-status-msg'), 'Privacy policy URL copied — paste it into the Play Console when it asks for a Privacy Policy URL.');
+      });
+    }
+    if ($('btn-pol-open-url')) {
+      $('btn-pol-open-url').addEventListener('click', function () {
+        var w = window.open(policyPublicUrl($('pol-app').value || ''), '_blank', 'noopener');
+        if (w) w.opener = null;
+      });
+    }
+
     $('btn-pol-fill').addEventListener('click', function () {
       var name = currentAppName($('pol-app').value) || 'This app';
       $('pol-content').value = POLICY_TEMPLATE.replace(/APP NAME/g, name);
@@ -706,7 +736,8 @@
         .then(function (json) {
           if (siteData) { siteData.policies = json.policies || siteData.policies; renderPolicies(siteData.apps, siteData.policies); renderChecklist(siteData); }
           $('pol-updated').textContent = new Date().toISOString().slice(0, 10);
-          setStatus($('pol-status-msg'), 'Policy saved — app-privacy.html?id=' + id + ' now shows this content.', true);
+          refreshPolicyUrl();
+          setStatus($('pol-status-msg'), 'Policy saved — your Play Store link is ' + policyPublicUrl(id) + ' (use Copy URL to paste it into the Play Console).', true);
         })
         .catch(function (err) { setStatus($('pol-status-msg'), err.message, false); });
     });

@@ -296,6 +296,13 @@ $meName = $me ? (string) ($me['name'] ?? '') : '';
             </select>
           </label>
         </div>
+        <label>Play Store privacy policy URL <span class="muted">(after saving, paste this link into the Play Console → App content → Privacy policy)</span>
+          <div class="url-copy">
+            <input type="text" id="pol-url" readonly value="">
+            <button class="btn btn-sm" type="button" id="btn-pol-copy-url">Copy URL</button>
+            <button class="btn btn-sm" type="button" id="btn-pol-open-url">Open ↗</button>
+          </div>
+        </label>
         <label>Policy HTML <span class="muted">· last updated: <span id="pol-updated">—</span></span>
           <textarea id="pol-content" rows="12" spellcheck="true"></textarea>
         </label>
