@@ -4,6 +4,10 @@
 
   var $ = function (id) { return document.getElementById(id); };
 
+  var mtRole = window.MT_ROLE || '';
+  var mtCanWrite = mtRole !== 'viewer';
+  var mtIsOwner = mtRole === 'owner';
+
   function encodeUTF8(value) {
     return btoa(unescape(encodeURIComponent(String(value))));
   }
@@ -51,17 +55,30 @@
 
     function attempt(pw1, pw2) {
       setStatus(status, 'Working…');
-      return api('login', { password: encodeUTF8(pw1), password2: encodeUTF8(pw2 || '') })
+      return api('login', {
+        username: $('username') ? String($('username').value || '').trim() : '',
+        name: $('name') ? String($('name').value || '').trim() : '',
+        password: encodeUTF8(pw1),
+        password2: encodeUTF8(pw2 || '')
+      })
         .then(function () { window.location.reload(); })
         .catch(function (err) { setStatus(status, err.message, false); });
     }
 
+    function enterOn(ids, handler) {
+      ids.forEach(function (id) {
+        var el = $(id);
+        if (el) el.addEventListener('keydown', function (e) { if (e.key === 'Enter') handler(); });
+      });
+    }
+
     if (btnLogin) {
       btnLogin.addEventListener('click', function () { attempt($('pw1').value, ''); });
-      $('pw1').addEventListener('keydown', function (e) { if (e.key === 'Enter') attempt($('pw1').value, ''); });
+      enterOn(['username', 'pw1'], function () { attempt($('pw1').value, ''); });
     }
     if (btnCreate) {
       btnCreate.addEventListener('click', function () { attempt($('pw1').value, $('pw2').value); });
+      enterOn(['name', 'username', 'pw1', 'pw2'], function () { attempt($('pw1').value, $('pw2').value); });
     }
   }
 
@@ -316,6 +333,8 @@
       renderPolicies(json.apps, json.policies || {});
       renderVerification(json.verification || []);
       renderChecklist(json);
+      renderUsers(json.users || []);
+      renderAudit(json.audit || []);
     }).catch(function (err) {
       setStatus($('apps-status'), err.message, false);
     });
@@ -748,8 +767,178 @@
     });
   }
 
+  /* ----------------------- admin users, passwords, audit ------------------- */
+
+  function renderUsers(users) {
+    var el = $('users-list');
+    if (!el) return;
+    if (!Array.isArray(users) || !users.length) {
+      el.innerHTML = '<p class="muted">No admin users yet. Use “+ New user” to add your first team member.</p>';
+      return;
+    }
+    var head = '<div class="user-table"><div class="user-row user-head"><span>Name</span><span>Username</span><span>Role</span><span>Last login / actions</span></div>';
+    el.innerHTML = head + users.map(function (u) {
+      var isYou = siteData && siteData.user && String(siteData.user.id) === String(u.id);
+      var delBtn = isYou ? '' : '<button class="btn btn-sm btn-danger" type="button" data-act="delete-user" data-id="' + escAttr(String(u.id)) + '">Delete</button>';
+      return '<div class="user-row">' +
+        '<span><strong>' + esc(String(u.name || u.username || '')) + '</strong>' + (isYou ? ' <span class="user-you">(you)</span>' : '') + '</span>' +
+        '<span><code>' + esc(String(u.username || '')) + '</code></span>' +
+        '<span><span class="pill pill-' + escAttr(String(u.role || 'viewer')) + '">' + esc(String(u.role || 'viewer')) + '</span></span>' +
+        '<span class="user-actions"><span class="muted">' + esc(String(u.lastLogin || 'never')) + '</span>' +
+          '<button class="btn btn-sm" type="button" data-act="edit-user" data-id="' + escAttr(String(u.id)) + '">Edit</button>' +
+          delBtn +
+        '</span></div>';
+    }).join('') + '</div>';
+
+    el.querySelectorAll('button[data-act="edit-user"]').forEach(function (btn) {
+      btn.addEventListener('click', function () { openUserEditor(btn.getAttribute('data-id')); });
+    });
+    el.querySelectorAll('button[data-act="delete-user"]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var id = btn.getAttribute('data-id');
+        var u = (siteData && siteData.users ? siteData.users : []).find(function (x) { return String(x.id) === String(id); });
+        if (!window.confirm('Delete user "' + (u ? String(u.username) : id) + '"? They will be signed out immediately.')) return;
+        api('delete-user', { id: id })
+          .then(function (json) {
+            if (siteData) siteData.users = json.users || [];
+            renderUsers(json.users || []);
+            if (json.audit) renderAudit(json.audit);
+            setStatus($('users-status'), 'User deleted.', true);
+          })
+          .catch(function (err) { setStatus($('users-status'), err.message, false); });
+      });
+    });
+  }
+
+  function openUserEditor(id) {
+    var editor = $('user-editor');
+    if (!editor || !siteData) return;
+    var users = siteData && siteData.users ? siteData.users : [];
+    var target = id ? users.find(function (u) { return String(u.id) === String(id); }) : null;
+    editor.hidden = false;
+    editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    $('usr-id').value = target ? String(target.id || '') : '';
+    $('usr-name').value = target ? String(target.name || '') : '';
+    $('usr-username').value = target ? String(target.username || '') : '';
+    $('usr-role').value = target ? String(target.role || 'editor') : 'editor';
+    $('usr-password').value = '';
+    $('usr-password').placeholder = target ? 'Leave blank to keep current password' : 'Set for new user';
+    $('user-editor-title').textContent = target ? 'Edit user' : 'New user';
+    $('user-editor-hint').textContent = target
+      ? 'Update this account. The password stays unchanged unless you set a new one here.'
+      : 'Create a login for someone who needs access to this console. They can change their own password after signing in.';
+    $('btn-user-delete').hidden = !target;
+    setStatus($('user-status-msg'), '');
+    $('usr-username').focus();
+  }
+
+  function renderAudit(entries) {
+    var el = $('audit-list');
+    if (!el) return;
+    if (!entries || !entries.length) {
+      el.innerHTML = '<p class="muted">No activity yet. Every sign-in and saved change will appear here.</p>';
+      return;
+    }
+    el.innerHTML = '<table class="audit-table"><thead><tr><th>When</th><th>User</th><th>Action</th><th>Details</th></tr></thead><tbody>' +
+      entries.slice(0, 100).map(function (e) {
+        return '<tr>' +
+          '<td>' + esc(String(e.d || '')) + '</td>' +
+          '<td>' + esc(String(e.u || '')) + '</td>' +
+          '<td class="audit-action">' + esc(String(e.a || '')) + '</td>' +
+          '<td class="audit-note">' + esc(String(e.x || '')) + '</td>' +
+          '</tr>';
+      }).join('') + '</tbody></table>';
+  }
+
+  function wireAccountFeatures() {
+    if (!MT_LOGGED_IN) return;
+
+    /* change password */
+    $('btn-change-pw').addEventListener('click', function () {
+      var card = $('pw-card');
+      card.hidden = !card.hidden;
+      if (!card.hidden) $('pw-current').focus();
+    });
+    $('btn-pw-cancel').addEventListener('click', function () { $('pw-card').hidden = true; });
+    $('pw-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      if ($('pw-new').value !== $('pw-new2').value) {
+        setStatus($('pw-status-msg'), 'The two new passwords do not match.', false);
+        return;
+      }
+      setStatus($('pw-status-msg'), 'Updating…');
+      api('change-password', {
+        current: encodeUTF8($('pw-current').value),
+        password: encodeUTF8($('pw-new').value),
+        password2: encodeUTF8($('pw-new2').value)
+      }).then(function (json) {
+        ['pw-current', 'pw-new', 'pw-new2'].forEach(function (id) { $(id).value = ''; });
+        $('pw-card').hidden = true;
+        if (json.audit) renderAudit(json.audit);
+        setStatus($('pw-status-msg'), 'Password updated.', true);
+      }).catch(function (err) { setStatus($('pw-status-msg'), err.message, false); });
+    });
+
+    /* admin users (owner only - the elements only exist for the owner) */
+    var btnNewUser = $('btn-new-user');
+    if (!btnNewUser) return;
+    btnNewUser.addEventListener('click', function () { openUserEditor(''); });
+    $('btn-user-cancel').addEventListener('click', function () { $('user-editor').hidden = true; });
+    $('btn-user-delete').addEventListener('click', function () {
+      var id = $('usr-id').value;
+      if (!id) return;
+      var u = (siteData && siteData.users ? siteData.users : []).find(function (x) { return String(x.id) === String(id); });
+      if (!window.confirm('Delete user "' + (u ? String(u.username) : id) + '"? They will be signed out immediately.')) return;
+      api('delete-user', { id: id })
+        .then(function (json) {
+          if (siteData) siteData.users = json.users || [];
+          renderUsers(json.users || []);
+          if (json.audit) renderAudit(json.audit);
+          $('user-editor').hidden = true;
+          setStatus($('users-status'), 'User deleted.', true);
+        })
+        .catch(function (err) { setStatus($('user-status-msg'), err.message, false); });
+    });
+    $('user-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var payload = {
+        id: $('usr-id').value,
+        name: $('usr-name').value,
+        username: $('usr-username').value,
+        role: $('usr-role').value
+      };
+      var pw = $('usr-password').value;
+      if (pw) payload.password = encodeUTF8(pw);
+      setStatus($('user-status-msg'), 'Saving…');
+      api('save-user', payload)
+        .then(function (json) {
+          if (siteData) siteData.users = json.users || [];
+          renderUsers(json.users || []);
+          if (json.audit) renderAudit(json.audit);
+          $('user-editor').hidden = true;
+          setStatus($('users-status'), 'User saved.', true);
+        })
+        .catch(function (err) { setStatus($('user-status-msg'), err.message, false); });
+    });
+
+    /* activity log (owner can clear) */
+    var btnAuditClear = $('btn-audit-clear');
+    if (btnAuditClear) {
+      btnAuditClear.addEventListener('click', function () {
+        if (!window.confirm('Clear the entire activity log? This cannot be undone.')) return;
+        api('audit-clear')
+          .then(function (json) {
+            renderAudit(json.audit || []);
+            setStatus($('audit-status'), 'Activity log cleared.', true);
+          })
+          .catch(function (err) { setStatus($('audit-status'), err.message, false); });
+      });
+    }
+  }
+
   wireLogin();
   wireDashboard();
   wireStoreFeatures();
+  wireAccountFeatures();
 })();
 

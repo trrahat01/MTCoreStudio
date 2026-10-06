@@ -27,12 +27,31 @@ $ADMIN_PASSWORD_HASH = '';
 function mt_session_start(): void
 {
     if (session_status() === PHP_SESSION_NONE) {
+        if (!headers_sent() && function_exists('session_set_cookie_params')) {
+            session_set_cookie_params([
+                'lifetime' => 0,
+                'path' => '/',
+                'httponly' => true,
+                'samesite' => 'Lax',
+            ]);
+        }
         session_name('mtcorestudio_admin');
         session_start();
         if (empty($_SESSION['csrf'])) {
             $_SESSION['csrf'] = bin2hex(random_bytes(16));
         }
     }
+}
+
+/* Security headers for the admin console: never framed (anti-clickjacking), */
+/* never cached, and the admin URL is never leaked to third-party sites.     */
+
+function mt_security_headers(): void
+{
+    header('X-Frame-Options: SAMEORIGIN');
+    header('X-Content-Type-Options: nosniff');
+    header('Referrer-Policy: no-referrer');
+    header('Cache-Control: no-store, private, max-age=0');
 }
 
 function mt_csrf(): string
@@ -50,7 +69,12 @@ function mt_verify_csrf(string $token): bool
 function mt_is_logged_in(): bool
 {
     mt_session_start();
-    return !empty($_SESSION['mt_admin']);
+    if (empty($_SESSION['mt_admin']) || empty($_SESSION['mt_uid'])) {
+        return false;
+    }
+    // Re-read the user store so a demoted/removed account stops working
+    // immediately instead of keeping a stale session alive.
+    return mt_user_by_id((string) $_SESSION['mt_uid']) !== null;
 }
 
 function mt_require_login(): void
@@ -142,6 +166,236 @@ function mt_set_password_hash(string $hash): bool
         return false;
     }
     return file_put_contents($path, implode("\n", $lines)) !== false;
+}
+
+/* ============================= admin users ================================= */
+/* Multi-user support. Accounts live in admin/users.json (blocked from web     */
+/* access by admin/.htaccess). Only bcrypt hashes are stored - never plaintext.*/
+/* Roles: owner (everything), editor (manage content), viewer (read-only).     */
+
+const MT_ROLES = ['owner', 'editor', 'viewer'];
+const MT_EDITOR_ACTIONS = [
+    'save-app', 'delete-app', 'import-play', 'save-config', 'save-ads',
+    'add-ads-line', 'save-policy', 'reset-policy', 'save-verification',
+    'delete-verification', 'waitlist-clear',
+];
+const MT_OWNER_ACTIONS = ['save-user', 'delete-user', 'visits-clear', 'audit-clear'];
+
+function mt_users_path(): string
+{
+    return MT_ADMIN_DIR . '/users.json';
+}
+
+function mt_read_users(): array
+{
+    $path = mt_users_path();
+    if (!is_file($path)) {
+        return [];
+    }
+    $decoded = json_decode((string) file_get_contents($path), true);
+    return is_array($decoded) ? array_values($decoded) : [];
+}
+
+function mt_write_users(array $users): bool
+{
+    return file_put_contents(mt_users_path(), json_encode(array_values($users), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)) !== false;
+}
+
+function mt_first_run(): bool
+{
+    return count(mt_read_users()) === 0;
+}
+
+function mt_new_uid(): string
+{
+    return 'u' . substr(bin2hex(random_bytes(4)), 0, 8);
+}
+
+function mt_valid_username(string $username): bool
+{
+    return preg_match('/^[a-zA-Z0-9_-]{3,24}$/', $username) === 1;
+}
+
+function mt_user_by_id(string $id): ?array
+{
+    foreach (mt_read_users() as $user) {
+        if ((string) ($user['id'] ?? '') === $id) {
+            return $user;
+        }
+    }
+    return null;
+}
+
+function mt_current_user(): ?array
+{
+    mt_session_start();
+    if (empty($_SESSION['mt_uid'])) {
+        return null;
+    }
+    return mt_user_by_id((string) $_SESSION['mt_uid']);
+}
+
+/* Public copy of a user without the password hash. */
+
+function mt_public_user(array $user): array
+{
+    return [
+        'id' => (string) ($user['id'] ?? ''),
+        'username' => (string) ($user['username'] ?? ''),
+        'name' => (string) ($user['name'] ?? ''),
+        'role' => (string) ($user['role'] ?? 'viewer'),
+        'created' => (string) ($user['created'] ?? ''),
+        'lastLogin' => (string) ($user['lastLogin'] ?? ''),
+    ];
+}
+
+function mt_public_users(array $users): array
+{
+    $out = [];
+    foreach ($users as $user) {
+        $out[] = mt_public_user((array) $user);
+    }
+    return $out;
+}
+
+/* ------------------------------ roles & access ---------------------------- */
+
+function mt_role(): string
+{
+    $user = mt_current_user();
+    return $user ? (string) ($user['role'] ?? 'viewer') : '';
+}
+
+function mt_role_rank(string $role): int
+{
+    if ($role === 'owner') return 3;
+    if ($role === 'editor') return 2;
+    return 1;
+}
+
+function mt_require_role(string $minimum): void
+{
+    mt_require_login();
+    if (mt_role_rank(mt_role()) < mt_role_rank($minimum)) {
+        mt_json(['ok' => false, 'error' => 'You do not have permission to do that. This attempt has been logged.'], 403);
+    }
+}
+
+function mt_current_username(): string
+{
+    $user = mt_current_user();
+    return $user ? (string) ($user['username'] ?? 'unknown') : 'system';
+}
+
+/* ----------------------------- activity audit ----------------------------- */
+/* Who changed what, when. Entries go to admin/audit.json (blocked from web    */
+/* access), newest 500 kept. Every write action is recorded so each admin can  */
+/* see what the others did.                                                    */
+
+function mt_audit_path(): string
+{
+    return MT_ADMIN_DIR . '/audit.json';
+}
+
+function mt_read_audit(): array
+{
+    $path = mt_audit_path();
+    if (!is_file($path)) {
+        return [];
+    }
+    $decoded = json_decode((string) file_get_contents($path), true);
+    return is_array($decoded) ? array_values($decoded) : [];
+}
+
+function mt_write_audit(array $entries): bool
+{
+    return file_put_contents(mt_audit_path(), json_encode(array_values($entries), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)) !== false;
+}
+
+function mt_audit(string $action, string $detail = ''): void
+{
+    $entries = mt_read_audit();
+    $entries[] = [
+        't' => time(),
+        'd' => date('Y-m-d H:i'),
+        'u' => mt_current_username(),
+        'a' => $action,
+        'x' => $detail,
+    ];
+    mt_write_audit(array_slice($entries, -500));
+}
+
+/* --------------------------- login throttle ------------------------------- */
+/* Brute-force guard: max 10 failed attempts per IP per 15 minutes.           */
+
+function mt_login_throttle_path(): string
+{
+    return MT_ADMIN_DIR . '/.login-attempts.json';
+}
+
+function mt_client_ip(): string
+{
+    return (string) ($_SERVER['REMOTE_ADDR'] ?? '');
+}
+
+function mt_login_throttled(string $key): bool
+{
+    $path = mt_login_throttle_path();
+    $log = [];
+    if (is_file($path)) {
+        $decoded = json_decode((string) file_get_contents($path), true);
+        if (is_array($decoded)) {
+            $log = $decoded;
+        }
+    }
+    $cut = time() - 900;
+    $count = 0;
+    $fresh = [];
+    foreach ($log as $entry) {
+        if ((int) ($entry['t'] ?? 0) <= $cut) {
+            continue;
+        }
+        $fresh[] = $entry;
+        if (($entry['k'] ?? '') === $key) {
+            $count++;
+        }
+    }
+    @file_put_contents($path, json_encode($fresh));
+    return $count >= 10;
+}
+
+function mt_login_record_failure(string $key): void
+{
+    $path = mt_login_throttle_path();
+    $log = [];
+    if (is_file($path)) {
+        $decoded = json_decode((string) file_get_contents($path), true);
+        if (is_array($decoded)) {
+            $log = $decoded;
+        }
+    }
+    $log[] = ['k' => $key, 't' => time()];
+    $log = array_values(array_slice($log, -2000));
+    @file_put_contents($path, json_encode($log));
+}
+
+function mt_login_clear(string $key): void
+{
+    $path = mt_login_throttle_path();
+    $log = [];
+    if (is_file($path)) {
+        $decoded = json_decode((string) file_get_contents($path), true);
+        if (is_array($decoded)) {
+            $log = $decoded;
+        }
+    }
+    $clean = [];
+    foreach ($log as $entry) {
+        if (($entry['k'] ?? '') !== $key) {
+            $clean[] = $entry;
+        }
+    }
+    @file_put_contents($path, json_encode($clean));
 }/* ------------------------------ data modules ------------------------------ */
 
 function mt_data_path(string $file): string

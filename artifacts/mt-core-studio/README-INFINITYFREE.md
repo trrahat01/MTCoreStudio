@@ -217,8 +217,19 @@ every account. The public pages themselves stay fully static and need no PHP.
 
 Open: https://yourdomain.com/admin/
 
-- First visit: create a password (stored only as a bcrypt hash; to reset, set
-  $ADMIN_PASSWORD_HASH back to '' inside admin/config.php).
+- First visit: create the owner account (your name, a username and a strong
+  password - stored only as a bcrypt hash in admin/users.json, never displayed
+  again). If you already used an old single-password setup, keep typing the
+  same password: it is migrated automatically.
+- Admin users: add team members with one of three roles:
+  * Owner - full control, including user management and clearing the activity log.
+  * Editor - can change apps, settings, policies, ads and other content.
+  * Viewer - read-only: can see everything but change nothing.
+  Everyone can change their own password. The last owner can never be demoted
+  or deleted, and nobody can delete their own account.
+- Activity log: every sign-in and every saved change is recorded (who, when,
+  what). Every admin - including editors and viewers - can see this log, so
+  everyone knows what the others did. Only owners can clear it.
 - Apps: add, edit, delete apps. Each save rewrites data/apps.js and is live
   on the public site immediately.
 - "Google Play link or package ID": paste a Play Store URL or a package ID
@@ -241,10 +252,15 @@ Open: https://yourdomain.com/admin/
   reviewers will look for (real canonical domain, contact email, app-ads.txt,
   per-app privacy policy + listing URL + Published status).
 
-Hardening: admin/config.php is denied to direct web access by .htaccess, the
-password is hashed, and every write requires a CSRF token. For extra safety
-remove the admin/ folder after making changes, protect it with a folder
-password in your hosting panel, or keep a long password.
+Hardening: admin/config.php and the admin data files (users.json, audit.json,
+.login-attempts.json) are denied to direct web access by admin/.htaccess,
+passwords are stored as bcrypt hashes, and every write requires a CSRF token.
+The console is never cached or framed (security headers), sessions use
+HttpOnly SameSite cookies and are replaced on login, the login screen is
+brute-force throttled (10 failed attempts per IP per 15 minutes), and every
+permission check happens server side - the buttons an account sees are just
+the UI. For extra safety remove the admin/ folder after making changes or
+protect it with a folder password in your hosting panel.
 
 ## 11. Set everything up in dash.infinityfree.com
 

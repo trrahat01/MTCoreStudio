@@ -370,3 +370,88 @@ input::placeholder, textarea::placeholder { color: #5c6f8c; }
 }
 .check-row.ok .check-mark { background: rgba(47, 214, 156, 0.16); color: var(--green); }
 .check-row.bad .check-mark { background: rgba(255, 93, 122, 0.14); color: var(--danger); }
+
+/* role-based UI gating (server still enforces everything - this is UX only) */
+body.mt-viewer button[type="submit"],
+body.mt-viewer #btn-new-app,
+body.mt-viewer #btn-waitlist-clear,
+body.mt-viewer #btn-visits-clear,
+body.mt-viewer #btn-pol-fill,
+body.mt-viewer #btn-pol-remove,
+body.mt-viewer .app-row-actions,
+body.mt-viewer .policy-actions,
+body.mt-viewer .file-actions,
+body.mt-viewer .user-chip-edit,
+body.mt-viewer #btn-audit-clear { display: none !important; }
+
+body.mt-viewer .hide-for-editor,
+body.mt-editor .hide-for-editor { display: none !important; }
+
+/* identity chip in the topbar */
+.user-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: rgba(6, 11, 21, 0.35);
+  font-size: 12.5px;
+}
+.user-chip-name { color: var(--text); font-weight: 650; }
+.pill-owner { color: #ffd166; border-color: rgba(255, 209, 102, 0.4); }
+.pill-editor { color: var(--cyan); border-color: rgba(56, 220, 255, 0.35); }
+.pill-viewer { color: var(--muted); border-color: rgba(148, 178, 224, 0.3); }
+
+/* admin users console */
+.user-list { margin-top: 6px; }
+.user-table { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.user-row {
+  display: grid;
+  grid-template-columns: 1.2fr 1.1fr 1fr 1.2fr;
+  gap: 10px;
+  padding: 11px 14px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  word-break: break-word;
+}
+.user-row:first-child { border-top: 0; }
+.user-head {
+  background: rgba(6, 11, 21, 0.5);
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.user-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 720px) {
+  .user-row { grid-template-columns: 1fr 1fr; }
+  .user-row span:nth-child(3), .user-row span:nth-child(4) { grid-column: 1 / -1; }
+}
+.user-you { color: var(--green); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+/* activity log */
+.audit-list { margin-top: 6px; }
+.audit-table { width: 100%; border-collapse: collapse; }
+.audit-table th {
+  text-align: left;
+  padding: 9px 12px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  background: rgba(6, 11, 21, 0.5);
+}
+.audit-table td {
+  padding: 9px 12px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  vertical-align: top;
+}
+.audit-table td:first-child { white-space: nowrap; color: var(--muted); }
+.audit-table td:nth-child(2) { font-weight: 650; white-space: nowrap; }
+.audit-action { color: var(--cyan); font-family: Consolas, monospace; font-size: 12px; }
+.audit-note { color: var(--muted); }
+@media (max-width: 720px) {
+  .audit-table th:nth-child(4), .audit-table td:nth-child(4) { display: none; }
+}

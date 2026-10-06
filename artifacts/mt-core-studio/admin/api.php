@@ -7,18 +7,26 @@
 require __DIR__ . '/config.php';
 
 mt_session_start();
+mt_security_headers();
 header('Content-Type: application/json; charset=utf-8');
-header('X-Content-Type-Options: nosniff');
 
 $action = mt_clean_text($_POST['action'] ?? ($_GET['action'] ?? ''), 40);
 
 /* ------------------------- sign in / first run ---------------------------- */
 
 if ($action === 'login') {
-    $hash = admin_password_hash();
+    $ip = mt_client_ip();
 
-    if ($hash === '') {
-        $password = (string) base64_decode((string) ($_POST['password'] ?? ''));
+    if (mt_login_throttled($ip)) {
+        mt_json(['ok' => false, 'error' => 'Too many failed attempts. Wait 15 minutes and try again.'], 429);
+    }
+
+    $username = strtolower(mt_clean_text($_POST['username'] ?? '', 60));
+    $password = (string) base64_decode((string) ($_POST['password'] ?? ''));
+    $users = mt_read_users();
+
+    // First run: no accounts exist yet. Create the owner account.
+    if (count($users) === 0) {
         $password2 = (string) base64_decode((string) ($_POST['password2'] ?? ''));
         if (strlen($password) < 8) {
             mt_json(['ok' => false, 'error' => 'Password must be at least 8 characters.'], 400);
@@ -26,23 +34,82 @@ if ($action === 'login') {
         if ($password !== $password2) {
             mt_json(['ok' => false, 'error' => 'The two passwords do not match.'], 400);
         }
-        if (!mt_set_password_hash(password_hash($password, PASSWORD_DEFAULT))) {
-            mt_json(['ok' => false, 'error' => 'Could not save the password hash. Make sure admin/config.php is writable by PHP.'], 500);
+        if (!mt_valid_username($username)) {
+            mt_json(['ok' => false, 'error' => 'Username must be 3-24 letters, numbers, _ or - (e.g. "owner").'], 400);
         }
+        $name = mt_clean_text($_POST['name'] ?? '', 80);
+        if ($name === '') {
+            $name = 'Admin';
+        }
+
+        // If this site upgraded from the old single-password setup, reuse that
+        // hash so the existing password keeps working, then clear the legacy
+        // hash so admin/config.php no longer holds credentials.
+        $hash = admin_password_hash();
+        if ($hash === '') {
+            $hash = password_hash($password, PASSWORD_DEFAULT);
+        } else {
+            mt_set_password_hash('');
+        }
+
+        $owner = [
+            'id' => mt_new_uid(),
+            'username' => $username,
+            'name' => $name,
+            'role' => 'owner',
+            'hash' => $hash,
+            'created' => date('Y-m-d H:i'),
+            'lastLogin' => date('Y-m-d H:i'),
+            'lastIp' => $ip,
+        ];
+        if (!mt_write_users([$owner])) {
+            mt_json(['ok' => false, 'error' => 'Could not create the admin account. Make sure the admin folder is writable by PHP.'], 500);
+        }
+        session_regenerate_id(true);
         $_SESSION['mt_admin'] = true;
-        mt_json(['ok' => true, 'firstRun' => true]);
+        $_SESSION['mt_uid'] = $owner['id'];
+        mt_audit('setup', 'Owner account "' . $username . '" created');
+        mt_json(['ok' => true, 'firstRun' => true, 'user' => mt_public_user($owner)]);
     }
 
-    $password = (string) base64_decode((string) ($_POST['password'] ?? ''));
-    if ($password === '' || !password_verify($password, $hash)) {
-        mt_json(['ok' => false, 'error' => 'Incorrect password.'], 403);
+    // Normal login: find the account and verify the password.
+    $user = null;
+    foreach ($users as $candidate) {
+        if ((string) ($candidate['username'] ?? '') === $username) {
+            $user = $candidate;
+            break;
+        }
     }
+    if ($user === null || !password_verify($password, (string) ($user['hash'] ?? ''))) {
+        mt_login_record_failure($ip);
+        mt_audit('login-failed', 'username "' . $username . '"');
+        mt_json(['ok' => false, 'error' => 'Incorrect username or password.'], 403);
+    }
+
+    mt_login_clear($ip);
     session_regenerate_id(true);
     $_SESSION['mt_admin'] = true;
-    mt_json(['ok' => true]);
+    $_SESSION['mt_uid'] = (string) ($user['id'] ?? '');
+
+    // Record the successful login in the user's profile.
+    $updated = [];
+    foreach ($users as $candidate) {
+        if ((string) ($candidate['id'] ?? '') === (string) ($user['id'] ?? '')) {
+            $candidate['lastLogin'] = date('Y-m-d H:i');
+            $candidate['lastIp'] = $ip;
+            $user = $candidate;
+        }
+        $updated[] = $candidate;
+    }
+    mt_write_users($updated);
+    mt_audit('login', $username);
+    mt_json(['ok' => true, 'user' => mt_public_user($user)]);
 }
 
 if ($action === 'logout') {
+    if (mt_is_logged_in()) {
+        mt_audit('logout', mt_current_username());
+    }
     $_SESSION = [];
     session_destroy();
     mt_json(['ok' => true]);
@@ -55,6 +122,16 @@ if (!mt_verify_csrf((string) ($_POST['csrf'] ?? ''))) {
     mt_json(['ok' => false, 'error' => 'Invalid security token. Please reload the page and try again.'], 403);
 }
 
+/* ------------------------------ access control ---------------------------- */
+/* owner level gates the most sensitive actions; editor level gates content   */
+/* changes; everything left below requires only an authenticated account.     */
+
+if (in_array($action, MT_OWNER_ACTIONS, true)) {
+    mt_require_role('owner');
+} elseif (in_array($action, MT_EDITOR_ACTIONS, true)) {
+    mt_require_role('editor');
+}
+
 if ($action === 'list') {
     mt_json([
         'ok' => true,
@@ -64,6 +141,9 @@ if ($action === 'list') {
         'policies' => mt_read_policies(),
         'verification' => mt_verification_files(),
         'categories' => ['Productivity', 'Education', 'Lifestyle', 'Entertainment', 'Tools', 'Other'],
+        'user' => mt_public_user(mt_current_user()),
+        'users' => mt_role() === 'owner' ? mt_public_users(mt_read_users()) : null,
+        'audit' => array_reverse(mt_read_audit()),
     ]);
 }
 
@@ -94,18 +174,26 @@ if ($action === 'save-app') {
     if (!mt_write_apps($updated)) {
         mt_json(['ok' => false, 'error' => 'Could not write data/apps.js. Check that the data folder is writable by PHP.'], 500);
     }
+    mt_audit('app-save', $app['name'] . ($found ? '' : ' (new)'));
     mt_json(['ok' => true, 'apps' => $updated]);
 }
 
 if ($action === 'delete-app') {
     $id = mt_clean_text($_POST['id'] ?? '', 200);
     $apps = mt_read_apps();
+    $name = '';
+    foreach ($apps as $app) {
+        if ((string) ($app['id'] ?? '') === $id) {
+            $name = (string) ($app['name'] ?? $id);
+        }
+    }
     $updated = array_values(array_filter($apps, static function ($a) use ($id): bool {
         return (string) ($a['id'] ?? '') !== $id;
     }));
     if (!mt_write_apps($updated)) {
         mt_json(['ok' => false, 'error' => 'Could not write data/apps.js. Check file permissions.'], 500);
     }
+    mt_audit('app-delete', $name);
     mt_json(['ok' => true, 'apps' => $updated]);
 }
 
@@ -113,6 +201,7 @@ if ($action === 'save-config') {
     if (!mt_write_config((array) $_POST)) {
         mt_json(['ok' => false, 'error' => 'Could not write data/site-config.js. Check file permissions.'], 500);
     }
+    mt_audit('settings-update', '');
     mt_json(['ok' => true, 'config' => mt_read_config()]);
 }
 
@@ -127,6 +216,7 @@ if ($action === 'save-ads') {
     if (!mt_write_ads($lines)) {
         mt_json(['ok' => false, 'error' => 'Could not write app-ads.txt. Check file permissions.'], 500);
     }
+    mt_audit('ads-update', count($lines) . ' publisher line(s)');
     mt_json(['ok' => true, 'ads' => $lines]);
 }
 
@@ -159,6 +249,7 @@ if ($action === 'import-play') {
         }
     }
 
+    mt_audit('app-import', $info['name'] . ' (' . $packageId . ')');
     mt_json(['ok' => true, 'info' => $info, 'iconSaved' => $iconSaved]);
 }
 
@@ -167,9 +258,11 @@ if ($action === 'waitlist-list') {
 }
 
 if ($action === 'waitlist-clear') {
+    $count = count(mt_read_waitlist());
     if (!mt_write_waitlist([])) {
         mt_json(['ok' => false, 'error' => 'Could not clear data/waitlist.js. Check file permissions.'], 500);
     }
+    mt_audit('waitlist-clear', $count . ' entries');
     mt_json(['ok' => true, 'waitlist' => []]);
 }
 
@@ -184,6 +277,7 @@ if ($action === 'visits-clear') {
     if (!mt_write_visits([])) {
         mt_json(['ok' => false, 'error' => 'Could not clear data/visits.js. Check file permissions.'], 500);
     }
+    mt_audit('visits-clear', '');
     mt_json(['ok' => true, 'stats' => mt_visit_stats()['stats'], 'countries' => []]);
 }
 
@@ -230,6 +324,7 @@ if ($action === 'save-policy') {
     if (!mt_write_policies($policies)) {
         mt_json(['ok' => false, 'error' => 'Could not write data/policies.js. Check that the data folder is writable by PHP.'], 500);
     }
+    mt_audit('policy-save', $id . ($status === 'completed' ? ' (completed)' : ' (draft)'));
     mt_json(['ok' => true, 'policies' => $policies]);
 }
 
@@ -242,6 +337,7 @@ if ($action === 'reset-policy') {
     if (!mt_write_policies($policies)) {
         mt_json(['ok' => false, 'error' => 'Could not write data/policies.js. Check file permissions.'], 500);
     }
+    mt_audit('policy-remove', $id);
     mt_json(['ok' => true, 'policies' => $policies]);
 }
 
@@ -285,6 +381,7 @@ if ($action === 'add-ads-line') {
         if (!mt_write_ads($lines)) {
             mt_json(['ok' => false, 'error' => 'Could not write app-ads.txt. Check file permissions.'], 500);
         }
+        mt_audit('ads-line-add', $line);
     }
     mt_json(['ok' => true, 'ads' => $lines]);
 }
@@ -303,6 +400,7 @@ if ($action === 'save-verification') {
     if (!mt_write_verification_file($name, $content)) {
         mt_json(['ok' => false, 'error' => 'Could not write the verification file. Check that the site root is writable by PHP.'], 500);
     }
+    mt_audit('verification-add', $name);
     mt_json(['ok' => true, 'verification' => mt_verification_files()]);
 }
 
@@ -314,7 +412,163 @@ if ($action === 'delete-verification') {
     if (!mt_delete_verification_file($name)) {
         mt_json(['ok' => false, 'error' => 'Could not delete the verification file. Check file permissions.'], 500);
     }
+    mt_audit('verification-delete', $name);
     mt_json(['ok' => true, 'verification' => mt_verification_files()]);
+}
+
+/* ------------------------- account & user management ---------------------- */
+
+if ($action === 'change-password') {
+    $current = (string) base64_decode((string) ($_POST['current'] ?? ''));
+    $next = (string) base64_decode((string) ($_POST['password'] ?? ''));
+    $next2 = (string) base64_decode((string) ($_POST['password2'] ?? ''));
+    if (strlen($next) < 8) {
+        mt_json(['ok' => false, 'error' => 'The new password must be at least 8 characters.'], 400);
+    }
+    if ($next !== $next2) {
+        mt_json(['ok' => false, 'error' => 'The two new passwords do not match.'], 400);
+    }
+    $me = mt_current_user();
+    if ($me === null || !password_verify($current, (string) ($me['hash'] ?? ''))) {
+        mt_json(['ok' => false, 'error' => 'Your current password is incorrect.'], 403);
+    }
+    $users = mt_read_users();
+    $updated = [];
+    foreach ($users as $candidate) {
+        if ((string) ($candidate['id'] ?? '') === (string) ($me['id'] ?? '')) {
+            $candidate['hash'] = password_hash($next, PASSWORD_DEFAULT);
+        }
+        $updated[] = $candidate;
+    }
+    if (!mt_write_users($updated)) {
+        mt_json(['ok' => false, 'error' => 'Could not save the new password. Check that the admin folder is writable by PHP.'], 500);
+    }
+    mt_audit('change-password', (string) ($me['username'] ?? ''));
+    mt_json(['ok' => true, 'audit' => array_reverse(mt_read_audit())]);
+}
+
+if ($action === 'save-user') {
+    mt_require_role('owner');
+    $id = trim((string) ($_POST['id'] ?? ''));
+    $username = strtolower(mt_clean_text($_POST['username'] ?? '', 60));
+    $name = mt_clean_text($_POST['name'] ?? '', 80);
+    $role = mt_clean_text($_POST['role'] ?? 'editor', 20);
+    if ($role !== 'owner' && $role !== 'editor' && $role !== 'viewer') {
+        $role = 'editor';
+    }
+    if (!mt_valid_username($username)) {
+        mt_json(['ok' => false, 'error' => 'Username must be 3-24 letters, numbers, _ or - (e.g. "editor1").'], 400);
+    }
+    if ($name === '') {
+        $name = $username;
+    }
+    $password = (string) base64_decode((string) ($_POST['password'] ?? ''));
+    if ($password !== '' && strlen($password) < 8) {
+        mt_json(['ok' => false, 'error' => 'Password must be at least 8 characters.'], 400);
+    }
+
+    $users = mt_read_users();
+    $me = mt_current_user();
+    $existing = null;
+    $existingIndex = -1;
+    foreach ($users as $i => $candidate) {
+        if ((string) ($candidate['id'] ?? '') === $id) {
+            $existing = $candidate;
+            $existingIndex = $i;
+        }
+        if ((string) ($candidate['username'] ?? '') === $username && (string) ($candidate['id'] ?? '') !== $id) {
+            mt_json(['ok' => false, 'error' => 'That username is already taken.'], 400);
+        }
+    }
+
+    // Owner integrity: never remove the last owner, and you cannot change
+    // your own role (use a second owner for that kind of change).
+    $ownerCount = 0;
+    foreach ($users as $candidate) {
+        if ((string) ($candidate['role'] ?? '') === 'owner') {
+            $ownerCount++;
+        }
+    }
+    if ($existing === null) {
+        if ($password === '') {
+            mt_json(['ok' => false, 'error' => 'A temporary password is required for a new user.'], 400);
+        }
+        $users[] = [
+            'id' => mt_new_uid(),
+            'username' => $username,
+            'name' => $name,
+            'role' => $role,
+            'hash' => password_hash($password, PASSWORD_DEFAULT),
+            'created' => date('Y-m-d H:i'),
+            'lastLogin' => '',
+            'lastIp' => '',
+        ];
+        mt_audit('user-create', $username . ' (' . $role . ')');
+    } else {
+        if ((string) ($existing['role'] ?? '') === 'owner' && $role !== 'owner' && $ownerCount <= 1) {
+            mt_json(['ok' => false, 'error' => 'Cannot demote the last owner. Create a second owner first.'], 400);
+        }
+        if ($me !== null && (string) ($existing['id'] ?? '') === (string) ($me['id'] ?? '') && $role !== 'owner') {
+            mt_json(['ok' => false, 'error' => 'You cannot change your own role.'], 400);
+        }
+        $existing['username'] = $username;
+        $existing['name'] = $name;
+        $existing['role'] = $role;
+        if ($password !== '') {
+            $existing['hash'] = password_hash($password, PASSWORD_DEFAULT);
+        }
+        $users[$existingIndex] = $existing;
+        mt_audit('user-update', $username . ($password !== '' ? ' (password reset)' : ''));
+    }
+    if (!mt_write_users(array_values($users))) {
+        mt_json(['ok' => false, 'error' => 'Could not save the user. Check that the admin folder is writable by PHP.'], 500);
+    }
+    mt_json(['ok' => true, 'users' => mt_public_users($users), 'audit' => array_reverse(mt_read_audit())]);
+}
+
+if ($action === 'delete-user') {
+    mt_require_role('owner');
+    $id = trim((string) ($_POST['id'] ?? ''));
+    $me = mt_current_user();
+    if ($id === '' || ($me !== null && $id === (string) ($me['id'] ?? ''))) {
+        mt_json(['ok' => false, 'error' => 'You cannot delete the account you are signed in with.'], 400);
+    }
+    $users = mt_read_users();
+    $target = null;
+    foreach ($users as $candidate) {
+        if ((string) ($candidate['id'] ?? '') === $id) {
+            $target = $candidate;
+        }
+    }
+    if ($target === null) {
+        mt_json(['ok' => false, 'error' => 'That user no longer exists.'], 404);
+    }
+    $ownerCount = 0;
+    foreach ($users as $candidate) {
+        if ((string) ($candidate['role'] ?? '') === 'owner') {
+            $ownerCount++;
+        }
+    }
+    if ((string) ($target['role'] ?? '') === 'owner' && $ownerCount <= 1) {
+        mt_json(['ok' => false, 'error' => 'Cannot remove the last owner. Create a second owner first.'], 400);
+    }
+    $remaining = array_values(array_filter($users, static function ($candidate) use ($id): bool {
+        return (string) ($candidate['id'] ?? '') !== $id;
+    }));
+    if (!mt_write_users($remaining)) {
+        mt_json(['ok' => false, 'error' => 'Could not delete the user. Check that the admin folder is writable by PHP.'], 500);
+    }
+    mt_audit('user-delete', (string) ($target['username'] ?? $id));
+    mt_json(['ok' => true, 'users' => mt_public_users($remaining), 'audit' => array_reverse(mt_read_audit())]);
+}
+
+if ($action === 'audit-clear') {
+    mt_require_role('owner');
+    if (!mt_write_audit([])) {
+        mt_json(['ok' => false, 'error' => 'Could not clear the activity log.'], 500);
+    }
+    mt_audit('audit-clear', '');
+    mt_json(['ok' => true, 'audit' => array_reverse(mt_read_audit())]);
 }
 
 mt_json(['ok' => false, 'error' => 'Unknown action.'], 400);

@@ -1,11 +1,15 @@
 <?php
 require __DIR__ . '/config.php';
 mt_session_start();
+mt_security_headers();
 
 $loggedIn = mt_is_logged_in();
-$firstRun = admin_password_hash() === '';
+$firstRun = mt_first_run();
 $csrf = mt_csrf();
 $host = (string) ($_SERVER['HTTP_HOST'] ?? 'localhost');
+$me = $loggedIn ? mt_current_user() : null;
+$role = $me ? (string) ($me['role'] ?? 'viewer') : '';
+$meName = $me ? (string) ($me['name'] ?? '') : '';
 ?>
 <!doctype html>
 <html lang="en">
@@ -17,7 +21,7 @@ $host = (string) ($_SERVER['HTTP_HOST'] ?? 'localhost');
 <link rel="icon" type="image/svg+xml" href="../assets/images/favicon.svg">
 <link rel="stylesheet" href="admin.css">
 </head>
-<body class="<?php echo $loggedIn ? 'is-auth' : 'is-login'; ?>">
+<body class="<?php echo trim(($loggedIn ? 'is-auth' : 'is-login') . ($loggedIn ? ' mt-' . htmlspecialchars($role, ENT_QUOTES, 'UTF-8') : '')); ?>">
 
 <div class="page">
 
@@ -28,20 +32,29 @@ $host = (string) ($_SERVER['HTTP_HOST'] ?? 'localhost');
       <img src="../assets/images/mt-core-studio-logo.png" alt="MT Core Studio logo" width="72" height="48">
       <div>
         <h1>MT Core Studio <span>Admin</span></h1>
-        <p><?php echo $firstRun ? 'Create a password to secure this console.' : 'Sign in to manage the website.'; ?></p>
+        <p><?php echo $firstRun ? 'Create the owner account to secure this console.' : 'Sign in to manage the website.'; ?></p>
       </div>
     </div>
 
     <?php if ($firstRun): ?>
-      <p class="notice">First run: choose a strong admin password (at least 8 characters). It is stored only as a secure hash and never displayed again.</p>
-      <label>New password
+      <p class="notice">First run: create the owner account. The password is stored only as a secure hash and is never displayed again. More team members with limited roles can be added afterwards.</p>
+      <label>Your name <span class="muted">(optional)</span>
+        <input type="text" id="name" autocomplete="name">
+      </label>
+      <label>Username
+        <input type="text" id="username" autocomplete="username" placeholder="owner" minlength="3" maxlength="24" required>
+      </label>
+      <label>Password
         <input type="password" id="pw1" autocomplete="new-password" minlength="8" required>
       </label>
       <label>Repeat password
         <input type="password" id="pw2" autocomplete="new-password" minlength="8" required>
       </label>
-      <button type="button" class="btn" id="btn-create">Create password &amp; enter</button>
+      <button type="button" class="btn" id="btn-create">Create owner &amp; enter</button>
     <?php else: ?>
+      <label>Username
+        <input type="text" id="username" autocomplete="username" placeholder="owner" required>
+      </label>
       <label>Password
         <input type="password" id="pw1" autocomplete="current-password" required>
       </label>
@@ -59,6 +72,11 @@ $host = (string) ($_SERVER['HTTP_HOST'] ?? 'localhost');
       <strong>MT Core Studio - Admin</strong>
     </div>
     <div class="topbar-actions">
+      <span class="user-chip" title="Signed in as <?php echo htmlspecialchars($meName, ENT_QUOTES, 'UTF-8'); ?>">
+        <?php if ($meName !== ''): ?><span class="user-chip-name"><?php echo htmlspecialchars($meName, ENT_QUOTES, 'UTF-8'); ?></span><?php endif; ?>
+        <span class="pill pill-<?php echo htmlspecialchars($role, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($role, ENT_QUOTES, 'UTF-8'); ?></span>
+      </span>
+      <button class="btn btn-ghost" type="button" id="btn-change-pw">Change password</button>
       <a class="btn btn-ghost" href="../index.html" target="_blank" rel="noopener">View site ^</a>
       <button class="btn btn-ghost" type="button" id="btn-logout">Sign out</button>
     </div>
@@ -91,7 +109,7 @@ $host = (string) ($_SERVER['HTTP_HOST'] ?? 'localhost');
         <div><h2>Visitors</h2><p>Anonymised traffic from the visit beacon (page + date + approximate country). No IP addresses or cookies are stored. Cleared automatically after 120 days.</p></div>
         <div class="row">
           <button class="btn" type="button" id="btn-visits-export">Export CSV</button>
-          <button class="btn btn-danger" type="button" id="btn-visits-clear">Clear all</button>
+          <button class="btn btn-danger hide-for-editor" type="button" id="btn-visits-clear">Clear all</button>
         </div>
       </div>
       <div id="visits-stats" class="visits-stats" aria-live="polite"></div>
@@ -316,6 +334,87 @@ $host = (string) ($_SERVER['HTTP_HOST'] ?? 'localhost');
       <p class="status muted" id="checklist-status"></p>
     </section>
 
+    <section class="card" id="pw-card" hidden>
+      <div class="card-head">
+        <div><h2>Change your password</h2><p>You will stay signed in everywhere after the change. The password is stored only as a secure hash.</p></div>
+      </div>
+      <form id="pw-form" autocomplete="off">
+        <div class="grid">
+          <label>Current password
+            <input type="password" id="pw-current" autocomplete="current-password" required>
+          </label>
+          <label>New password <span class="muted">(min. 8 characters)</span>
+            <input type="password" id="pw-new" autocomplete="new-password" minlength="8" required>
+          </label>
+        </div>
+        <label>Repeat new password
+          <input type="password" id="pw-new2" autocomplete="new-password" minlength="8" required>
+        </label>
+        <div class="row">
+          <button class="btn btn-primary" type="submit">Update password</button>
+          <button class="btn" type="button" id="btn-pw-cancel">Close</button>
+          <span class="status" id="pw-status-msg" role="status"></span>
+        </div>
+      </form>
+    </section>
+
+    <?php if ($role === 'owner'): ?>
+    <section class="card">
+      <div class="card-head">
+        <div><h2>Admin users</h2><p>Add team members and choose what each one can do: <strong>Owner</strong> has full control (including users &amp; activity log), <strong>Editor</strong> can change content, <strong>Viewer</strong> can only look.</p></div>
+        <button class="btn" type="button" id="btn-new-user">+ New user</button>
+      </div>
+      <div id="users-list" class="user-list" aria-live="polite"></div>
+      <p class="status muted" id="users-status"></p>
+    </section>
+
+    <section class="card" id="user-editor" hidden>
+      <div class="card-head">
+        <div><h2 id="user-editor-title">New user</h2><p id="user-editor-hint">Create a login for someone who needs access to this console.</p></div>
+      </div>
+      <form id="user-form" autocomplete="off">
+        <input type="hidden" id="usr-id" value="">
+        <div class="grid">
+          <label>Name
+            <input type="text" id="usr-name" placeholder="Team member">
+          </label>
+          <label>Username <span class="muted">(3-24 letters, numbers, _ or -)</span>
+            <input type="text" id="usr-username" placeholder="editor1" minlength="3" maxlength="24" required>
+          </label>
+        </div>
+        <div class="grid">
+          <label>Role
+            <select id="usr-role">
+              <option value="editor">Editor — can change content</option>
+              <option value="viewer">Viewer — read-only</option>
+              <option value="owner">Owner — full control</option>
+            </select>
+          </label>
+          <label id="usr-password-label">Temporary password <span class="muted">(min. 8 characters)</span>
+            <input type="password" id="usr-password" autocomplete="new-password" placeholder="Set for new user" minlength="8">
+          </label>
+        </div>
+        <div class="row">
+          <button class="btn btn-primary" type="submit" id="btn-user-save">Save user</button>
+          <button class="btn btn-danger" type="button" id="btn-user-delete" hidden>Delete user</button>
+          <button class="btn" type="button" id="btn-user-cancel">Cancel</button>
+          <span class="status" id="user-status-msg" role="status"></span>
+        </div>
+      </form>
+    </section>
+    <?php endif; ?>
+
+    <section class="card">
+      <div class="card-head">
+        <div><h2>Activity log</h2><p>Every account change and content save is recorded here, so each admin can see what the others did.</p></div>
+        <div class="row">
+          <button class="btn btn-danger hide-for-editor" type="button" id="btn-audit-clear">Clear log</button>
+        </div>
+      </div>
+      <div id="audit-list" class="audit-list" aria-live="polite"></div>
+      <p class="status muted" id="audit-status"></p>
+    </section>
+
   </main>
 
 <?php endif; ?>
@@ -326,6 +425,7 @@ $host = (string) ($_SERVER['HTTP_HOST'] ?? 'localhost');
   var MT_CSRF = <?php echo json_encode($csrf, JSON_UNESCAPED_SLASHES); ?>;
   var MT_LOGGED_IN = <?php echo $loggedIn ? 'true' : 'false'; ?>;
   var MT_FIRST_RUN = <?php echo $firstRun ? 'true' : 'false'; ?>;
+  var MT_ROLE = <?php echo json_encode($role, JSON_UNESCAPED_SLASHES); ?>;
 </script>
 <script src="admin.js"></script>
 </body>
