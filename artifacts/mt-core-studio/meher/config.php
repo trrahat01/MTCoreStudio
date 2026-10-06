@@ -2,13 +2,14 @@
 /**
  * MT Core Studio - admin configuration and shared helpers
  * -----------------------------------------------------
- * Lives inside public_html/admin/. There is NO plain-text password in this
- * file: the admin panel asks you to create a password on first visit and
- * stores only its bcrypt hash in $ADMIN_PASSWORD_HASH below.
+ * Lives inside public_html/<console-folder>/ (this file moved out of the
+ * obvious admin/ name so the panel is not guessable). There is NO plain-text
+ * password in this file: the console asks you to create a password on first
+ * visit and stores only its bcrypt hash in $ADMIN_PASSWORD_HASH below.
  *
  * To reset the password: set $ADMIN_PASSWORD_HASH back to '' (between the
- * single quotes) and open /admin/ again - you will be asked to create a new
- * one. Do not share this file with anyone.
+ * single quotes) and open the console again - you will be asked to create a
+ * new one. Do not share this file with anyone.
  */
 
 declare(strict_types=1);
@@ -216,6 +217,12 @@ function mt_valid_username(string $username): bool
     return preg_match('/^[a-zA-Z0-9_-]{3,24}$/', $username) === 1;
 }
 
+function mt_valid_email(string $email): bool
+{
+    $email = trim($email);
+    return $email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL) !== false;
+}
+
 function mt_user_by_id(string $id): ?array
 {
     foreach (mt_read_users() as $user) {
@@ -243,6 +250,7 @@ function mt_public_user(array $user): array
         'id' => (string) ($user['id'] ?? ''),
         'username' => (string) ($user['username'] ?? ''),
         'name' => (string) ($user['name'] ?? ''),
+        'email' => (string) ($user['email'] ?? ''),
         'role' => (string) ($user['role'] ?? 'viewer'),
         'created' => (string) ($user['created'] ?? ''),
         'lastLogin' => (string) ($user['lastLogin'] ?? ''),

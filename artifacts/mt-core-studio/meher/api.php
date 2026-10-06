@@ -21,8 +21,9 @@ if ($action === 'login') {
         mt_json(['ok' => false, 'error' => 'Too many failed attempts. Wait 15 minutes and try again.'], 429);
     }
 
-    $username = strtolower(mt_clean_text($_POST['username'] ?? '', 60));
+    $username = strtolower(mt_clean_text($_POST['username'] ?? '', 120));
     $password = (string) base64_decode((string) ($_POST['password'] ?? ''));
+    $login = $username;
     $users = mt_read_users();
 
     // First run: no accounts exist yet. Create the owner account.
@@ -41,10 +42,14 @@ if ($action === 'login') {
         if ($name === '') {
             $name = 'Admin';
         }
+        $email = strtolower(mt_clean_text($_POST['email'] ?? '', 254));
+        if ($email !== '' && !mt_valid_email($email)) {
+            mt_json(['ok' => false, 'error' => 'That email address does not look valid.'], 400);
+        }
 
         // If this site upgraded from the old single-password setup, reuse that
         // hash so the existing password keeps working, then clear the legacy
-        // hash so admin/config.php no longer holds credentials.
+        // hash so meher/config.php no longer holds credentials.
         $hash = admin_password_hash();
         if ($hash === '') {
             $hash = password_hash($password, PASSWORD_DEFAULT);
@@ -56,6 +61,7 @@ if ($action === 'login') {
             'id' => mt_new_uid(),
             'username' => $username,
             'name' => $name,
+            'email' => $email,
             'role' => 'owner',
             'hash' => $hash,
             'created' => date('Y-m-d H:i'),
@@ -72,10 +78,14 @@ if ($action === 'login') {
         mt_json(['ok' => true, 'firstRun' => true, 'user' => mt_public_user($owner)]);
     }
 
-    // Normal login: find the account and verify the password.
+    // Normal login: find the account by username OR email address.
     $user = null;
     foreach ($users as $candidate) {
-        if ((string) ($candidate['username'] ?? '') === $username) {
+        if ((string) ($candidate['username'] ?? '') === $login) {
+            $user = $candidate;
+            break;
+        }
+        if ($login !== '' && (string) ($candidate['email'] ?? '') === $login) {
             $user = $candidate;
             break;
         }
@@ -452,12 +462,16 @@ if ($action === 'save-user') {
     $id = trim((string) ($_POST['id'] ?? ''));
     $username = strtolower(mt_clean_text($_POST['username'] ?? '', 60));
     $name = mt_clean_text($_POST['name'] ?? '', 80);
+    $email = strtolower(mt_clean_text($_POST['email'] ?? '', 254));
     $role = mt_clean_text($_POST['role'] ?? 'editor', 20);
     if ($role !== 'owner' && $role !== 'editor' && $role !== 'viewer') {
         $role = 'editor';
     }
     if (!mt_valid_username($username)) {
         mt_json(['ok' => false, 'error' => 'Username must be 3-24 letters, numbers, _ or - (e.g. "editor1").'], 400);
+    }
+    if ($email !== '' && !mt_valid_email($email)) {
+        mt_json(['ok' => false, 'error' => 'That email address does not look valid.'], 400);
     }
     if ($name === '') {
         $name = $username;
@@ -479,6 +493,9 @@ if ($action === 'save-user') {
         if ((string) ($candidate['username'] ?? '') === $username && (string) ($candidate['id'] ?? '') !== $id) {
             mt_json(['ok' => false, 'error' => 'That username is already taken.'], 400);
         }
+        if ($email !== '' && (string) ($candidate['email'] ?? '') === $email && (string) ($candidate['id'] ?? '') !== $id) {
+            mt_json(['ok' => false, 'error' => 'That email address is already in use.'], 400);
+        }
     }
 
     // Owner integrity: never remove the last owner, and you cannot change
@@ -497,6 +514,7 @@ if ($action === 'save-user') {
             'id' => mt_new_uid(),
             'username' => $username,
             'name' => $name,
+            'email' => $email,
             'role' => $role,
             'hash' => password_hash($password, PASSWORD_DEFAULT),
             'created' => date('Y-m-d H:i'),
@@ -513,6 +531,7 @@ if ($action === 'save-user') {
         }
         $existing['username'] = $username;
         $existing['name'] = $name;
+        $existing['email'] = $email;
         $existing['role'] = $role;
         if ($password !== '') {
             $existing['hash'] = password_hash($password, PASSWORD_DEFAULT);

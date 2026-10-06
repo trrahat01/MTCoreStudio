@@ -15,8 +15,8 @@ export const siteConfig = {
   brandName: "MT Core Studio",
   tagline: "BUILD • INNOVATE • SIMPLIFY",
 
-  // Public support / contact email (e.g. "support@mtcorestudio.com")
-  email: "",
+  // Public support / contact email
+  email: "trrahat03@gmail.com",
 
   // Official public profile URLs. Only add links you own and verified.
   playStoreUrl: "", // Google Play developer page (https://play.google.com/store/apps/dev?id=...)

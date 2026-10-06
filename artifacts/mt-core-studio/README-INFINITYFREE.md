@@ -2,8 +2,9 @@
 
 This is a **static website**: HTML5 + CSS3 + vanilla JavaScript. There is **no
 Node.js or database requirement — the public pages are plain static HTML/CSS/JS**. Two optional
-features use the free PHP included on every InfinityFree account: the **admin console** (`admin/`,
-for editing apps in the browser) and the **launch waitlist** (`api/waitlist.php`, so visitors can
+features use the free PHP included on every InfinityFree account: the **private console** (`meher/`,
+for editing apps in the browser — you can rename this folder to any hard-to-guess name) and the
+**launch waitlist** (`api/waitlist.php`, so visitors can
 join per-app waitlists). The files run exactly as they
 are. All app information lives in one editable data file, so the site stays
 easy to maintain as the app collection grows.
@@ -41,7 +42,7 @@ api/waitlist.php    Public waitlist endpoint (needs PHP - included free on Infin
 api/visit.php       Anonymous visit beacon (needs PHP - powers the admin Visitors stats)
 app-ads.txt         AdMob app-ads.txt verification
 .htaccess           Root Apache config (protects data/visits.js + data/waitlist.js)
-admin/              Optional PHP admin console (apps, settings, waitlist, visitors, privacy policies, App Store verification)
+meher/              Private PHP console (apps, settings, waitlist, visitors, privacy policies, verification). Rename the folder for extra obscurity.
 data/apps.js        ★ App directory data — edit this to add apps
 data/posts.js       Blog posts
 data/policies.js    Per-app privacy policies (written from the admin console, read by app-privacy.html)
@@ -210,17 +211,24 @@ To finish AdMob verification:
 This file is public by design - it exists exactly so anyone can verify which
 advertising accounts are authorized to sell inventory for the apps.
 
-## 10. Admin console - manage apps from the browser
+## 10. Private console - manage apps from the browser
 
 Optional but recommended. It uses PHP, which InfinityFree includes free on
 every account. The public pages themselves stay fully static and need no PHP.
 
-Open: https://yourdomain.com/admin/
+The console lives in the `meher/` folder instead of the obvious `admin/`, and
+the site root returns a 404 for `/admin`, `/wp-admin`, `/login` and similar
+probes — so the panel is effectively unguessable. For even better obscurity,
+rename the `meher/` folder to anything else you like (and update the two
+`require ... meher/config.php` lines in `api/waitlist.php` and `api/visit.php`).
+
+Open: https://yourdomain.com/<your-secret-folder>/
 
 - First visit: create the owner account (your name, a username and a strong
-  password - stored only as a bcrypt hash in admin/users.json, never displayed
-  again). If you already used an old single-password setup, keep typing the
-  same password: it is migrated automatically.
+  password - stored only as a bcrypt hash in meher/users.json, never displayed
+  again). You can also add an email address and then sign in with either your
+  username or that email. If you already used an old single-password setup,
+  keep typing the same password: it is migrated automatically.
 - Admin users: add team members with one of three roles:
   * Owner - full control, including user management and clearing the activity log.
   * Editor - can change apps, settings, policies, ads and other content.
@@ -252,15 +260,17 @@ Open: https://yourdomain.com/admin/
   reviewers will look for (real canonical domain, contact email, app-ads.txt,
   per-app privacy policy + listing URL + Published status).
 
-Hardening: admin/config.php and the admin data files (users.json, audit.json,
-.login-attempts.json) are denied to direct web access by admin/.htaccess,
+Hardening: meher/config.php and the console data files (users.json, audit.json,
+.login-attempts.json) are denied to direct web access by meher/.htaccess,
 passwords are stored as bcrypt hashes, and every write requires a CSRF token.
 The console is never cached or framed (security headers), sessions use
 HttpOnly SameSite cookies and are replaced on login, the login screen is
 brute-force throttled (10 failed attempts per IP per 15 minutes), and every
 permission check happens server side - the buttons an account sees are just
-the UI. For extra safety remove the admin/ folder after making changes or
-protect it with a folder password in your hosting panel.
+the UI. The site root additionally answers 404 to probes for well-known admin
+paths and forbids direct download of config/readme files. For extra safety
+you can protect the folder further with a folder password in your hosting
+panel or move/rename it after each use.
 
 ## 11. Set everything up in dash.infinityfree.com
 
@@ -272,12 +282,12 @@ protect it with a folder password in your hosting panel.
    them into public_html. FTP details are under "FTP details" in the panel
    if you prefer FileZilla.
 3. Permissions are fine at the default values. PHP writes data/*.js,
-   admin/config.php and app-ads.txt with the account's own permissions.
+   meher/config.php and app-ads.txt with the account's own permissions.
 4. Check:
    - https://yourdomain.infinityfreeapp.com/ (the website)
    - https://yourdomain.infinityfreeapp.com/app-ads.txt (AdMob file)
-5. Open https://yourdomain.infinityfreeapp.com/admin/ once and set the admin
-   password.
+5. Open https://yourdomain.infinityfreeapp.com/meher/ once and create the
+   owner account.
 6. Add your site to Google Search Console and submit sitemap.xml.
 7. When ready for a custom domain: Account -> Domains -> Add a domain, point
    the nameservers InfinityFree shows you, then run the https://example.com

@@ -8,8 +8,8 @@
 # example:  https://yourdomain.com/app-ads.txt
 #
 # To add or remove a publisher line, edit this file (or use the MT Core Studio
-# admin console at /admin/). After any change, wait at least 24 hours, then
-# check the status under AdMob -> Apps -> app-ads.txt.
+# private console at the URL you chose). After any change, wait at least 24 hours,
+# then check the status under AdMob -> Apps -> app-ads.txt.
 
 google.com, pub-7383364741984927, DIRECT, f08c47fec0942fa0
 google.com, pub-1463796060515114, DIRECT, f08c47fec0942fa0

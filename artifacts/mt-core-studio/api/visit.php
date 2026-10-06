@@ -16,7 +16,7 @@
  * /admin. Requires PHP - included free on InfinityFree.
  */
 
-require dirname(__DIR__) . '/admin/config.php';
+require dirname(__DIR__) . '/meher/config.php';
 
 header('X-Content-Type-Options: nosniff');
 

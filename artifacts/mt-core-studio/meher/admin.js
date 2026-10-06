@@ -58,6 +58,7 @@
       return api('login', {
         username: $('username') ? String($('username').value || '').trim() : '',
         name: $('name') ? String($('name').value || '').trim() : '',
+        email: $('email') ? String($('email').value || '').trim() : '',
         password: encodeUTF8(pw1),
         password2: encodeUTF8(pw2 || '')
       })
@@ -781,7 +782,8 @@
       var isYou = siteData && siteData.user && String(siteData.user.id) === String(u.id);
       var delBtn = isYou ? '' : '<button class="btn btn-sm btn-danger" type="button" data-act="delete-user" data-id="' + escAttr(String(u.id)) + '">Delete</button>';
       return '<div class="user-row">' +
-        '<span><strong>' + esc(String(u.name || u.username || '')) + '</strong>' + (isYou ? ' <span class="user-you">(you)</span>' : '') + '</span>' +
+        '<span><strong>' + esc(String(u.name || u.username || '')) + '</strong>' + (isYou ? ' <span class="user-you">(you)</span>' : '') +
+        '<br><span class="muted">' + esc(String(u.email || '')) + '</span></span>' +
         '<span><code>' + esc(String(u.username || '')) + '</code></span>' +
         '<span><span class="pill pill-' + escAttr(String(u.role || 'viewer')) + '">' + esc(String(u.role || 'viewer')) + '</span></span>' +
         '<span class="user-actions"><span class="muted">' + esc(String(u.lastLogin || 'never')) + '</span>' +
@@ -820,6 +822,7 @@
     $('usr-id').value = target ? String(target.id || '') : '';
     $('usr-name').value = target ? String(target.name || '') : '';
     $('usr-username').value = target ? String(target.username || '') : '';
+    $('usr-email').value = target ? String(target.email || '') : '';
     $('usr-role').value = target ? String(target.role || 'editor') : 'editor';
     $('usr-password').value = '';
     $('usr-password').placeholder = target ? 'Leave blank to keep current password' : 'Set for new user';
@@ -905,6 +908,7 @@
         id: $('usr-id').value,
         name: $('usr-name').value,
         username: $('usr-username').value,
+        email: $('usr-email').value,
         role: $('usr-role').value
       };
       var pw = $('usr-password').value;

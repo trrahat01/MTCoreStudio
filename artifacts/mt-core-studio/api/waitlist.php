@@ -16,7 +16,7 @@
  * Requires PHP - InfinityFree includes it for free on every account.
  */
 
-require dirname(__DIR__) . '/admin/config.php';
+require dirname(__DIR__) . '/meher/config.php';
 
 header('X-Content-Type-Options: nosniff');
 

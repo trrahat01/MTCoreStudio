@@ -44,6 +44,9 @@ $meName = $me ? (string) ($me['name'] ?? '') : '';
       <label>Username
         <input type="text" id="username" autocomplete="username" placeholder="owner" minlength="3" maxlength="24" required>
       </label>
+      <label>Email address <span class="muted">(optional — can be used to sign in)</span>
+        <input type="email" id="email" autocomplete="email" placeholder="you@example.com">
+      </label>
       <label>Password
         <input type="password" id="pw1" autocomplete="new-password" minlength="8" required>
       </label>
@@ -52,8 +55,8 @@ $meName = $me ? (string) ($me['name'] ?? '') : '';
       </label>
       <button type="button" class="btn" id="btn-create">Create owner &amp; enter</button>
     <?php else: ?>
-      <label>Username
-        <input type="text" id="username" autocomplete="username" placeholder="owner" required>
+      <label>Username or email address
+        <input type="text" id="username" autocomplete="username" placeholder="owner or you@example.com" required>
       </label>
       <label>Password
         <input type="password" id="pw1" autocomplete="current-password" required>
@@ -382,6 +385,9 @@ $meName = $me ? (string) ($me['name'] ?? '') : '';
             <input type="text" id="usr-username" placeholder="editor1" minlength="3" maxlength="24" required>
           </label>
         </div>
+        <label>Email address <span class="muted">(optional — can be used to sign in)</span>
+          <input type="email" id="usr-email" placeholder="teammate@example.com">
+        </label>
         <div class="grid">
           <label>Role
             <select id="usr-role">
