@@ -10,10 +10,10 @@
  *   page     relative path visited, e.g. "/index.html" or "/app.html?id=..."
  *   country  2-letter country code, best-effort from the client (or blank)
  *
- * Privacy: NO IP addresses, emails, names or cookies are stored. Only the
- * page + date (+ optional country code) are saved in data/visits.js, which
- * is web-inaccessible (see the site root .htaccess). Stats stay private in
- * /admin. Requires PHP - included free on InfinityFree.
+ * Privacy: raw IP addresses are never stored. Only a salted one-way HMAC
+ * hash of each visitor's IP is kept (used to count new vs returning visitors),
+ * together with the page + date (+ optional country code). The log lives in
+ * data/visits.js, which is web-inaccessible (see the site root .htaccess).
  */
 
 require dirname(__DIR__) . '/meher/config.php';
@@ -41,6 +41,6 @@ if (mt_visit_rate_limited('visit:' . $ip)) {
     mt_json(['ok' => true, 'throttled' => true]);
 }
 
-mt_record_visit($page, $country);
+mt_record_visit($page, $country, $ip);
 
 mt_json(['ok' => true, 'throttled' => false]);

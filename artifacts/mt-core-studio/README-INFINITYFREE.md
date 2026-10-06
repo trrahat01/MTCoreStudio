@@ -238,8 +238,19 @@ Open: https://yourdomain.com/<your-secret-folder>/
 - Activity log: every sign-in and every saved change is recorded (who, when,
   what). Every admin - including editors and viewers - can see this log, so
   everyone knows what the others did. Only owners can clear it.
-- Apps: add, edit, delete apps. Each save rewrites data/apps.js and is live
-  on the public site immediately.
+- Apps: add, edit, delete apps - shown as a table with a quick status dropdown
+  (Published / Draft) per row. Each save rewrites data/apps.js and is live
+  on the public site immediately (data files are always revalidated: the
+  service worker fetches data/*.js network-first and the root .htaccess sends
+  `Cache-Control: no-cache` for them, so a status change can never be served
+  stale from a browser or proxy cache).
+- Legal / Policy Source URL (per app): paste ONE page that links to the app's
+  Privacy Policy and Terms of Service (for example your GitHub Pages legal
+  hub). On save, the console reads that page and fills any EMPTY policy URL
+  automatically - existing URLs are never overwritten, and anything that could
+  not be detected comes back as a visible warning instead of a silent save.
+  The public app page then shows "[ Privacy Policy ] [ Terms of Service ]"
+  links side by side (the Terms link appears as soon as one is available).
 - "Google Play link or package ID": paste a Play Store URL or a package ID
   (e.g. com.example.app). It auto-fills name, package, category, description,
   downloads the icon into assets/apps/, and fills screenshots.
@@ -259,6 +270,14 @@ Open: https://yourdomain.com/<your-secret-folder>/
 - Launch readiness: a live checklist that flags anything Play Store or AdMob
   reviewers will look for (real canonical domain, contact email, app-ads.txt,
   per-app privacy policy + listing URL + Published status).
+- Dashboard & analytics: the console opens on a dashboard with live totals
+  (apps by status, total / today's / unique visitors, page views, most-visited
+  page), recent activity and quick actions. The Analytics section offers date
+  ranges (Today / 7 days / 30 days / All time) with a daily trend chart,
+  a new-vs-returning mix, top pages (views / unique visitors / average) and top
+  countries. IP Analysis lists salted one-way visitor hashes - raw IPs are
+  never stored or shown - with New / Returning / Repeated badges, search and
+  paging, and Most Visited Pages is sortable by any column.
 
 Hardening: meher/config.php and the console data files (users.json, audit.json,
 .login-attempts.json) are denied to direct web access by meher/.htaccess,

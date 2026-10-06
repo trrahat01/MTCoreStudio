@@ -75,6 +75,7 @@ $meName = $me ? (string) ($me['name'] ?? '') : '';
       <strong>MT Core Studio - Admin</strong>
     </div>
     <div class="topbar-actions">
+      <button class="btn btn-ghost nav-toggle" type="button" id="nav-toggle" aria-label="Toggle menu">☰ Menu</button>
       <span class="user-chip" title="Signed in as <?php echo htmlspecialchars($meName, ENT_QUOTES, 'UTF-8'); ?>">
         <?php if ($meName !== ''): ?><span class="user-chip-name"><?php echo htmlspecialchars($meName, ENT_QUOTES, 'UTF-8'); ?></span><?php endif; ?>
         <span class="pill pill-<?php echo htmlspecialchars($role, ENT_QUOTES, 'UTF-8'); ?>"><?php echo htmlspecialchars($role, ENT_QUOTES, 'UTF-8'); ?></span>
@@ -84,9 +85,75 @@ $meName = $me ? (string) ($me['name'] ?? '') : '';
       <button class="btn btn-ghost" type="button" id="btn-logout">Sign out</button>
     </div>
   </header>
+  <div class="shell">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-head">
+      <img src="../assets/images/mt-core-studio-logo.png" alt="" width="44" height="28">
+      <div><strong>MT Core Studio</strong><span>Admin console</span></div>
+    </div>
+    <nav id="sidebar-nav" aria-label="Console sections">
+      <div class="nav-group"><span class="nav-title">Dashboard</span>
+        <a href="#" data-nav="dashboard" class="nav-link" title="Overview"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/></svg><span>Overview</span></a>
+      </div>
+      <div class="nav-group"><span class="nav-title">Apps</span>
+        <a href="#" data-nav="apps" class="nav-link" title="All Apps"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span>All Apps</span></a>
+        <a href="#" data-nav="app-edit" class="nav-link" title="Add App"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span>Add App</span></a>
+        <a href="#" data-nav="categories" class="nav-link" title="Categories"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12.5V4.5A1.5 1.5 0 0 1 4.5 3h8L21 11.5 12.5 20 3 12.5z"/><circle cx="7.8" cy="7.8" r="1.4"/></svg><span>Categories</span></a>
+      </div>
+      <div class="nav-group"><span class="nav-title">Analytics</span>
+        <a href="#" data-nav="analytics" class="nav-link" title="Overview"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18"/><path d="M6 17v-5M11 17V7M16 17v-8M21 17v-3"/></svg><span>Overview</span></a>
+        <a href="#" data-nav="visitors" class="nav-link" title="Visitors"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12S6 6.5 12 6.5 21.5 12 21.5 12 18 17.5 12 17.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg><span>Visitors</span></a>
+        <a href="#" data-nav="ip-analysis" class="nav-link" title="IP Analysis"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3 7 21M17 3l-2 21M4 8.5h16M3.5 15.5h16"/></svg><span>IP Analysis</span></a>
+        <a href="#" data-nav="pages" class="nav-link" title="Most Visited Pages"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7l-4-4z"/><path d="M14 3v4h4M9 13h6M9 17h5"/></svg><span>Most Visited Pages</span></a>
+      </div>
+      <div class="nav-group"><span class="nav-title">Content</span>
+        <a href="#" data-nav="readiness" class="nav-link" title="Website Overview"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4.5a3 3 0 0 1 6 0M9.2 13.2l2 2 3.6-3.8"/></svg><span>Website Overview</span></a>
+        <a href="#" data-nav="policies" class="nav-link" title="Legal Policies"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8.2-8 9-4.5-.8-8-4-8-9V6l8-3z"/><path d="m9 12 2 2 4-4.5"/></svg><span>Legal Policies</span></a>
+        <a href="#" data-nav="waitlist" class="nav-link" title="Waitlist"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 7 8.5 6 8.5-6"/></svg><span>Waitlist</span></a>
+        <a href="#" data-nav="ads" class="nav-link" title="AdMob &amp; app-ads.txt"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10v4h3.5L13 18V6l-6.5 4H3zM16.5 9a4.5 4.5 0 0 1 0 6"/></svg><span>AdMob &amp; app-ads.txt</span></a>
+        <a href="#" data-nav="verification" class="nav-link" title="Play Verification"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8.3 12.2 2.5 2.5 4.9-5.4"/></svg><span>Play Verification</span></a>
+      </div>
+      <div class="nav-group"><span class="nav-title">Settings</span>
+        <a href="#" data-nav="settings" class="nav-link" title="General"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h9M17.5 7H20M4 17h3.5M12 17h8"/><circle cx="15" cy="7" r="2.2"/><circle cx="9.5" cy="17" r="2.2"/></svg><span>General</span></a>
+        <?php if ($role === 'owner'): ?>
+        <a href="#" data-nav="users" class="nav-link" title="Admin Users"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8.5" r="3.5"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5M16 5a3.5 3.5 0 0 1 0 7M17.5 14.7c2 .8 3.5 2.6 3.5 5.3"/></svg><span>Admin Users</span></a>
+        <?php endif; ?>
+        <a href="#" data-nav="activity" class="nav-link" title="Activity Log"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13M3.6 6h.01M3.6 12h.01M3.6 18h.01"/></svg><span>Activity Log</span></a>
+      </div>
+    </nav>
+    <div class="sidebar-foot">
+      <a href="../index.html" target="_blank" rel="noopener" class="side-foot-link"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.7 3.9 5.7 3.9 9S14.6 18.3 12 21c-2.6-2.7-3.9-5.7-3.9-9S9.4 5.7 12 3z"/></svg><span>Open website ↗</span></a>
+      <button class="btn btn-ghost side-logout" type="button" id="btn-logout-side"><svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 12H3.5M7.5 8l-4 4 4 4M13 4.5h5a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5h-5"/></svg><span>Logout</span></button>
+    </div>
+  </aside>
+  <div class="nav-scrim" id="nav-scrim" hidden></div>
   <main class="content">
 
-    <section class="card">
+    <section class="card" data-view="dashboard">
+      <div class="card-head">
+        <div><h2>Dashboard</h2><p>Live numbers from your app directory, visit log and activity trail — real data only, never estimated.</p></div>
+        <button class="btn btn-sm" type="button" id="btn-dash-refresh">Refresh</button>
+      </div>
+      <div id="dash-stats" class="stat-grid" aria-live="polite"></div>
+      <div class="grid-2" style="margin-top:18px">
+        <div>
+          <h3 class="sub-h">Recent activity</h3>
+          <div id="dash-activity" class="audit-list" aria-live="polite"></div>
+        </div>
+        <div>
+          <h3 class="sub-h">Quick actions</h3>
+          <div class="quick-actions">
+            <button class="btn" type="button" data-quick="new-app">+ Add app</button>
+            <button class="btn" type="button" data-quick="policies">Legal policies</button>
+            <button class="btn" type="button" data-quick="analytics">View analytics</button>
+            <button class="btn" type="button" data-quick="settings">Site settings</button>
+          </div>
+          <p class="status muted" id="dash-status" role="status"></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" data-view="apps">
       <div class="card-head">
         <div><h2>Apps</h2><p>Add, edit or remove apps. Changes go live immediately on the public website.</p></div>
         <button class="btn" type="button" id="btn-new-app">+ New app</button>
@@ -95,7 +162,14 @@ $meName = $me ? (string) ($me['name'] ?? '') : '';
       <p class="status muted" id="apps-status"></p>
     </section>
 
-    <section class="card">
+    <section class="card" data-view="categories">
+      <div class="card-head">
+        <div><h2>Categories</h2><p>Every app grouped by its Category field. New categories appear automatically — click an app to edit it.</p></div>
+      </div>
+      <div id="categories-list" aria-live="polite"></div>
+    </section>
+
+    <section class="card" data-view="waitlist">
       <div class="card-head">
         <div><h2>Waitlist</h2><p>Emails captured from the "Notify me" forms on app pages. Export to CSV to import into your mail tool.</p></div>
         <div class="row">
@@ -107,9 +181,9 @@ $meName = $me ? (string) ($me['name'] ?? '') : '';
       <p class="status muted" id="waitlist-status"></p>
     </section>
 
-    <section class="card">
+    <section class="card" data-view="visitors">
       <div class="card-head">
-        <div><h2>Visitors</h2><p>Anonymised traffic from the visit beacon (page + date + approximate country). No IP addresses or cookies are stored. Cleared automatically after 120 days.</p></div>
+        <div><h2>Visitors</h2><p>Traffic from the visit beacon: page views over time, country breakdown, top pages, and new vs returning visitors (IPs are stored only as salted hashes — never the raw address). Log auto-trims after 120 days.</p></div>
         <div class="row">
           <button class="btn" type="button" id="btn-visits-export">Export CSV</button>
           <button class="btn btn-danger hide-for-editor" type="button" id="btn-visits-clear">Clear all</button>
@@ -119,7 +193,79 @@ $meName = $me ? (string) ($me['name'] ?? '') : '';
       <p class="status muted" id="visits-status"></p>
     </section>
 
-    <section class="card" id="editor" hidden>
+    <section class="card" data-view="analytics">
+      <div class="card-head">
+        <div><h2>Analytics overview</h2><p>Real traffic from the anonymous visit beacon — IPs are stored only as salted hashes and never leave this console.</p></div>
+        <div class="row range-group" data-range-for="analytics" role="group" aria-label="Date range">
+          <button class="btn btn-sm range-btn" type="button" data-range="today">Today</button>
+          <button class="btn btn-sm range-btn" type="button" data-range="7">7 Days</button>
+          <button class="btn btn-sm range-btn active" type="button" data-range="30">30 Days</button>
+          <button class="btn btn-sm range-btn" type="button" data-range="all">All Time</button>
+        </div>
+      </div>
+      <div id="an-stats" class="stat-grid" aria-live="polite"></div>
+      <div class="grid-2" style="margin-top:18px">
+        <div>
+          <h3 class="sub-h">Daily visits</h3>
+          <div class="chart-box" id="an-trend"></div>
+        </div>
+        <div>
+          <h3 class="sub-h">New vs returning visitors</h3>
+          <div class="chart-box" id="an-mix"></div>
+        </div>
+      </div>
+      <div class="grid-2" style="margin-top:18px">
+        <div>
+          <h3 class="sub-h">Top pages</h3>
+          <div id="an-pages" class="page-list"></div>
+        </div>
+        <div>
+          <h3 class="sub-h">Top countries</h3>
+          <div id="an-countries" class="country-list"></div>
+        </div>
+      </div>
+      <p class="status muted" id="an-status" role="status"></p>
+    </section>
+
+    <section class="card" data-view="ip-analysis">
+      <div class="card-head">
+        <div><h2>IP analysis</h2><p>Visits grouped per anonymised visitor. “New address” never appeared in your log before this range; “Same address” was seen before or repeated. Raw IPs are never stored or shown.</p></div>
+        <div class="row range-group" data-range-for="ips" role="group" aria-label="Date range">
+          <button class="btn btn-sm range-btn" type="button" data-range="today">Today</button>
+          <button class="btn btn-sm range-btn" type="button" data-range="7">7 Days</button>
+          <button class="btn btn-sm range-btn active" type="button" data-range="30">30 Days</button>
+          <button class="btn btn-sm range-btn" type="button" data-range="all">All Time</button>
+        </div>
+      </div>
+      <div id="ip-summary" class="stat-grid" aria-live="polite"></div>
+      <div class="row ip-toolbar">
+        <input type="search" id="ip-search" placeholder="Search by visitor id, e.g. a1b2c3d4e5f6">
+        <span class="muted" id="ip-count"></span>
+      </div>
+      <div id="ip-table" aria-live="polite"></div>
+      <div class="row pager" id="ip-pager"></div>
+      <p class="status muted" id="ip-status" role="status"></p>
+    </section>
+
+    <section class="card" data-view="pages">
+      <div class="card-head">
+        <div><h2>Most visited pages</h2><p>Sorted by views from the visit beacon. Click a column header to re-sort; all numbers are exact counts from the log.</p></div>
+        <div class="row range-group" data-range-for="pages" role="group" aria-label="Date range">
+          <button class="btn btn-sm range-btn" type="button" data-range="today">Today</button>
+          <button class="btn btn-sm range-btn" type="button" data-range="7">7 Days</button>
+          <button class="btn btn-sm range-btn active" type="button" data-range="30">30 Days</button>
+          <button class="btn btn-sm range-btn" type="button" data-range="all">All Time</button>
+        </div>
+      </div>
+      <div class="row ip-toolbar">
+        <input type="search" id="pages-search" placeholder="Search pages, e.g. /apps">
+        <span class="muted" id="pages-count"></span>
+      </div>
+      <div id="pages-table" aria-live="polite"></div>
+      <p class="status muted" id="pages-status" role="status"></p>
+    </section>
+
+    <section class="card" id="editor" data-view="app-edit">
       <div class="card-head">
         <div><h2 id="editor-title">Add a new app</h2>
         <p>Tip: paste a Google Play link below to auto-fill most fields.</p></div>
@@ -168,8 +314,19 @@ $meName = $me ? (string) ($me['name'] ?? '') : '';
           <label>Google Play URL
             <input type="url" id="f-play-url" placeholder="https://play.google.com/store/apps/details?id=...">
           </label>
+          <div class="field-block" style="grid-column: 1 / -1;">
+            <label for="f-policy-source">Legal / Policy Source URL <span class="muted">(one page that links to BOTH policies — the two URLs below are detected from it on save)</span></label>
+            <div class="row">
+              <input type="url" id="f-policy-source" placeholder="https://mtcorestudio.github.io/daily-spark-privacy/" style="flex: 1; min-width: 240px;">
+              <button class="btn btn-sm" type="button" id="btn-detect-legal">Detect links</button>
+            </div>
+            <p class="status" id="legal-status" role="status"></p>
+          </div>
           <label>Privacy policy URL
-            <input type="url" id="f-privacy-url" placeholder="https://.../privacy.html">
+            <input type="url" id="f-privacy-url" placeholder="https://.../privacy-policy">
+          </label>
+          <label>Terms of Service URL
+            <input type="url" id="f-terms-url" placeholder="https://.../terms-of-service">
           </label>
           <label>Icon path <span class="muted">(optional)</span>
             <input type="text" id="f-icon" placeholder="assets/apps/example.png">
@@ -190,7 +347,7 @@ $meName = $me ? (string) ($me['name'] ?? '') : '';
         </div>
       </form>
     </section>
-    <section class="card">
+    <section class="card" data-view="settings">
       <div class="card-head">
         <div><h2>Site settings</h2><p>Public contact channels and developer profile details shown on the website.</p></div>
       </div>
@@ -228,7 +385,7 @@ $meName = $me ? (string) ($me['name'] ?? '') : '';
       </form>
     </section>
 
-    <section class="card">
+    <section class="card" data-view="ads">
       <div class="card-head">
         <div><h2>AdMob &amp; app-ads.txt</h2><p>AdMob verifies you as an authorized seller of your app inventory through this file at the site root. Enter each AdMob publisher ID below, then check AdMob → Apps → app-ads.txt after 24 hours.</p></div>
       </div>
@@ -272,7 +429,7 @@ $meName = $me ? (string) ($me['name'] ?? '') : '';
       </form>
     </section>
 
-    <section class="card">
+    <section class="card" data-view="policies">
       <div class="card-head">
         <div><h2>Privacy policies <span class="muted">(Play Store)</span></h2><p>Google Play requires every app to have a public privacy-policy URL. Write each policy here — it is published at <code>app-privacy.html?id=&lt;app&gt;</code> and ready to paste into the Play Console.</p></div>
       </div>
@@ -280,7 +437,7 @@ $meName = $me ? (string) ($me['name'] ?? '') : '';
       <p class="status muted" id="policies-status"></p>
     </section>
 
-    <section class="card" id="policy-editor" hidden>
+    <section class="card" id="policy-editor" data-view="policy-edit">
       <div class="card-head">
         <div><h2 id="policy-editor-title">Edit privacy policy</h2><p>Simple HTML is fine — <code>&lt;h2&gt;</code> for section headings and <code>&lt;p&gt;</code> for paragraphs (the default template matches the site’s policy styling).</p></div>
       </div>
@@ -316,7 +473,7 @@ $meName = $me ? (string) ($me['name'] ?? '') : '';
       </form>
     </section>
 
-    <section class="card">
+    <section class="card" data-view="verification">
       <div class="card-head">
         <div><h2>Google Play site verification</h2><p>When the Play Console asks you to verify that you own a website, Google provides a file name like <code>google1a2b3c.html</code> with exact content. Add it here to host it instantly at the site root.</p></div>
       </div>
@@ -336,15 +493,15 @@ $meName = $me ? (string) ($me['name'] ?? '') : '';
       </form>
     </section>
 
-    <section class="card">
+    <section class="card" data-view="readiness">
       <div class="card-head">
-        <div><h2>Launch readiness</h2><p>Everything Google Play and AdMob reviewers look at, checked live against the data you have entered.</p></div>
+        <div><h2>Website Overview</h2><p>Launch readiness — everything Google Play and AdMob reviewers look at, checked live against the data you have entered.</p></div>
       </div>
       <div id="checklist-list" class="checklist" aria-live="polite"></div>
       <p class="status muted" id="checklist-status"></p>
     </section>
 
-    <section class="card" id="pw-card" hidden>
+    <section class="card" id="pw-card" data-view="pass">
       <div class="card-head">
         <div><h2>Change your password</h2><p>You will stay signed in everywhere after the change. The password is stored only as a secure hash.</p></div>
       </div>
@@ -369,7 +526,7 @@ $meName = $me ? (string) ($me['name'] ?? '') : '';
     </section>
 
     <?php if ($role === 'owner'): ?>
-    <section class="card">
+    <section class="card" data-view="users">
       <div class="card-head">
         <div><h2>Admin users</h2><p>Add team members and choose what each one can do: <strong>Owner</strong> has full control (including users &amp; activity log), <strong>Editor</strong> can change content, <strong>Viewer</strong> can only look.</p></div>
         <button class="btn" type="button" id="btn-new-user">+ New user</button>
@@ -378,7 +535,7 @@ $meName = $me ? (string) ($me['name'] ?? '') : '';
       <p class="status muted" id="users-status"></p>
     </section>
 
-    <section class="card" id="user-editor" hidden>
+    <section class="card" id="user-editor" data-view="user-edit">
       <div class="card-head">
         <div><h2 id="user-editor-title">New user</h2><p id="user-editor-hint">Create a login for someone who needs access to this console.</p></div>
       </div>
@@ -417,7 +574,7 @@ $meName = $me ? (string) ($me['name'] ?? '') : '';
     </section>
     <?php endif; ?>
 
-    <section class="card">
+    <section class="card" data-view="activity">
       <div class="card-head">
         <div><h2>Activity log</h2><p>Every account change and content save is recorded here, so each admin can see what the others did.</p></div>
         <div class="row">
@@ -429,6 +586,7 @@ $meName = $me ? (string) ($me['name'] ?? '') : '';
     </section>
 
   </main>
+  </div><!-- /.shell -->
 
 <?php endif; ?>
 

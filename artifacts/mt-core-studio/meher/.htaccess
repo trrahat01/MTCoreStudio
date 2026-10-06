@@ -16,7 +16,7 @@ Options -Indexes
   </FilesMatch>
 </IfModule>
 
-<FilesMatch "\.(log|json|md)$">
+<FilesMatch "\.(log|json|md)$|^\.(visit-secret|rate-limit|login-attempts)">
   <IfModule mod_authz_core.c>
     Require all denied
   </IfModule>

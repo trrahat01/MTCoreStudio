@@ -9,7 +9,7 @@
  * caches are replaced instead of lingering.
  * ------------------------------------------------------------------------- */
 
-const CACHE = "mt-core-studio-v2";
+const CACHE = "mt-core-studio-v4";
 const ROOT = "./";
 
 self.addEventListener("install", (event) => {
@@ -47,13 +47,18 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  // Data and the waitlist API change constantly - always try the network first.
-  const isLiveData = url.pathname.includes("/data/") || url.pathname.includes("/api/");
+  // Data (data/*.js), the APIs and the site script change with every admin
+  // save - they must never be served from a stale cache, otherwise an app
+  // status or policy edit takes hours/days to show up (the original bug).
+  const isLiveData =
+    url.pathname.includes("/data/") ||
+    url.pathname.includes("/api/") ||
+    url.pathname.includes("/js/");
 
   // Pages: network first, fall back to the cached copy, then to index.html.
   if (request.mode === "navigate") {
     event.respondWith(
-      fetch(request)
+      fetch(request, { cache: "no-cache" })
         .then((response) => {
           const copy = response.clone();
           caches.open(CACHE).then((cache) => cache.put(request, copy));
@@ -65,6 +70,22 @@ self.addEventListener("fetch", (event) => {
             return caches.match(ROOT).then((root) => root || caches.match("./index.html"));
           })
         )
+    );
+    return;
+  }
+
+  // Live data always goes to the network first with revalidation forced
+  // (cache: "no-cache" bypasses the HTTP cache), refreshes the stored copy,
+  // and only falls back to the cached copy when offline.
+  if (isLiveData) {
+    event.respondWith(
+      fetch(request, { cache: "no-cache" })
+        .then((response) => {
+          const copy = response.clone();
+          if (response.ok) caches.open(CACHE).then((cache) => cache.put(request, copy));
+          return response;
+        })
+        .catch(() => caches.match(request))
     );
     return;
   }

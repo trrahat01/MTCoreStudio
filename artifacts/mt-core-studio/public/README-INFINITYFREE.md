@@ -2,8 +2,9 @@
 
 This is a **static website**: HTML5 + CSS3 + vanilla JavaScript. There is **no
 Node.js or database requirement — the public pages are plain static HTML/CSS/JS**. Two optional
-features use the free PHP included on every InfinityFree account: the **admin console** (`admin/`,
-for editing apps in the browser) and the **launch waitlist** (`api/waitlist.php`, so visitors can
+features use the free PHP included on every InfinityFree account: the **private console** (`meher/`,
+for editing apps in the browser — you can rename this folder to any hard-to-guess name) and the
+**launch waitlist** (`api/waitlist.php`, so visitors can
 join per-app waitlists). The files run exactly as they
 are. All app information lives in one editable data file, so the site stays
 easy to maintain as the app collection grows.
@@ -41,9 +42,10 @@ api/waitlist.php    Public waitlist endpoint (needs PHP - included free on Infin
 api/visit.php       Anonymous visit beacon (needs PHP - powers the admin Visitors stats)
 app-ads.txt         AdMob app-ads.txt verification
 .htaccess           Root Apache config (protects data/visits.js + data/waitlist.js)
-admin/              Optional PHP admin console (apps, settings, waitlist, visitors)
+meher/              Private PHP console (apps, settings, waitlist, visitors, privacy policies, verification). Rename the folder for extra obscurity.
 data/apps.js        ★ App directory data — edit this to add apps
 data/posts.js       Blog posts
+data/policies.js    Per-app privacy policies (written from the admin console, read by app-privacy.html)
 data/changelog.js   Release notes (updates.html + app pages)
 data/waitlist.js    Waitlist emails (written by the waitlist endpoint)
 data/visits.js      Anonymised visit log (written by the visit beacon, read in admin)
@@ -201,34 +203,93 @@ To finish AdMob verification:
 3. Wait at least 24 hours for Google to crawl it (it can take longer).
 4. In AdMob go to Apps -> your app -> app-ads.txt and check the status. You
    can also open https://google.com/adsense/local-ads.txt to see crawled lines.
-5. Need to add another publisher account later? Add one line per account and
-   re-upload, or use the admin console (section 10).
+5. Need to add or remove a publisher account later? Add one line per account
+   and re-upload, or use the **AdMob helper** in the admin console (section 10):
+   enter the publisher ID - it builds the correct line and appends it to
+   app-ads.txt for you.
 
 This file is public by design - it exists exactly so anyone can verify which
 advertising accounts are authorized to sell inventory for the apps.
 
-## 10. Admin console - manage apps from the browser
+## 10. Private console - manage apps from the browser
 
 Optional but recommended. It uses PHP, which InfinityFree includes free on
 every account. The public pages themselves stay fully static and need no PHP.
 
-Open: https://yourdomain.com/admin/
+The console lives in the `meher/` folder instead of the obvious `admin/`, and
+the site root returns a 404 for `/admin`, `/wp-admin`, `/login` and similar
+probes — so the panel is effectively unguessable. For even better obscurity,
+rename the `meher/` folder to anything else you like (and update the two
+`require ... meher/config.php` lines in `api/waitlist.php` and `api/visit.php`).
 
-- First visit: create a password (stored only as a bcrypt hash; to reset, set
-  $ADMIN_PASSWORD_HASH back to '' inside admin/config.php).
-- Apps: add, edit, delete apps. Each save rewrites data/apps.js and is live
-  on the public site immediately.
+Open: https://yourdomain.com/<your-secret-folder>/
+
+- First visit: create the owner account (your name, a username and a strong
+  password - stored only as a bcrypt hash in meher/users.json, never displayed
+  again). You can also add an email address and then sign in with either your
+  username or that email. If you already used an old single-password setup,
+  keep typing the same password: it is migrated automatically.
+- Admin users: add team members with one of three roles:
+  * Owner - full control, including user management and clearing the activity log.
+  * Editor - can change apps, settings, policies, ads and other content.
+  * Viewer - read-only: can see everything but change nothing.
+  Everyone can change their own password. The last owner can never be demoted
+  or deleted, and nobody can delete their own account.
+- Activity log: every sign-in and every saved change is recorded (who, when,
+  what). Every admin - including editors and viewers - can see this log, so
+  everyone knows what the others did. Only owners can clear it.
+- Apps: add, edit, delete apps - shown as a table with a quick status dropdown
+  (Published / Draft) per row. Each save rewrites data/apps.js and is live
+  on the public site immediately (data files are always revalidated: the
+  service worker fetches data/*.js network-first and the root .htaccess sends
+  `Cache-Control: no-cache` for them, so a status change can never be served
+  stale from a browser or proxy cache).
+- Legal / Policy Source URL (per app): paste ONE page that links to the app's
+  Privacy Policy and Terms of Service (for example your GitHub Pages legal
+  hub). On save, the console reads that page and fills any EMPTY policy URL
+  automatically - existing URLs are never overwritten, and anything that could
+  not be detected comes back as a visible warning instead of a silent save.
+  The public app page then shows "[ Privacy Policy ] [ Terms of Service ]"
+  links side by side (the Terms link appears as soon as one is available).
 - "Google Play link or package ID": paste a Play Store URL or a package ID
   (e.g. com.example.app). It auto-fills name, package, category, description,
   downloads the icon into assets/apps/, and fills screenshots.
 - Site settings: email, Google Play developer page, social links, developer
   name, country - writes data/site-config.js.
-- app-ads.txt tab: edit the publisher lines directly and save.
+- app-ads.txt tab: edit the publisher lines directly and save, or use the
+  "Add an AdMob publisher line" helper (domain + pub- ID + DIRECT/RESELLER).
+- Privacy policies (Play Store): write each app's policy in a small HTML
+  editor (or start from the default template). Saved policies are published
+  instantly at app-privacy.html?id=<app-id> - use the "Copy URL" button to
+  paste the exact privacy-policy URL into the Play Console. It also marks the
+  policy Draft / Completed so you know what is ready before you submit.
+- Google Play site verification: when Play Console asks you to verify a
+  website, it gives you a file name like google1a2b3c.html plus its exact
+  content. Add it here and it is hosted immediately at the site root; remove
+  it again once the verification is finished.
+- Launch readiness: a live checklist that flags anything Play Store or AdMob
+  reviewers will look for (real canonical domain, contact email, app-ads.txt,
+  per-app privacy policy + listing URL + Published status).
+- Dashboard & analytics: the console opens on a dashboard with live totals
+  (apps by status, total / today's / unique visitors, page views, most-visited
+  page), recent activity and quick actions. The Analytics section offers date
+  ranges (Today / 7 days / 30 days / All time) with a daily trend chart,
+  a new-vs-returning mix, top pages (views / unique visitors / average) and top
+  countries. IP Analysis lists salted one-way visitor hashes - raw IPs are
+  never stored or shown - with New / Returning / Repeated badges, search and
+  paging, and Most Visited Pages is sortable by any column.
 
-Hardening: admin/config.php is denied to direct web access by .htaccess, the
-password is hashed, and every write requires a CSRF token. For extra safety
-remove the admin/ folder after making changes, protect it with a folder
-password in your hosting panel, or keep a long password.
+Hardening: meher/config.php and the console data files (users.json, audit.json,
+.login-attempts.json) are denied to direct web access by meher/.htaccess,
+passwords are stored as bcrypt hashes, and every write requires a CSRF token.
+The console is never cached or framed (security headers), sessions use
+HttpOnly SameSite cookies and are replaced on login, the login screen is
+brute-force throttled (10 failed attempts per IP per 15 minutes), and every
+permission check happens server side - the buttons an account sees are just
+the UI. The site root additionally answers 404 to probes for well-known admin
+paths and forbids direct download of config/readme files. For extra safety
+you can protect the folder further with a folder password in your hosting
+panel or move/rename it after each use.
 
 ## 11. Set everything up in dash.infinityfree.com
 
@@ -240,12 +301,12 @@ password in your hosting panel, or keep a long password.
    them into public_html. FTP details are under "FTP details" in the panel
    if you prefer FileZilla.
 3. Permissions are fine at the default values. PHP writes data/*.js,
-   admin/config.php and app-ads.txt with the account's own permissions.
+   meher/config.php and app-ads.txt with the account's own permissions.
 4. Check:
    - https://yourdomain.infinityfreeapp.com/ (the website)
    - https://yourdomain.infinityfreeapp.com/app-ads.txt (AdMob file)
-5. Open https://yourdomain.infinityfreeapp.com/admin/ once and set the admin
-   password.
+5. Open https://yourdomain.infinityfreeapp.com/meher/ once and create the
+   owner account.
 6. Add your site to Google Search Console and submit sitemap.xml.
 7. When ready for a custom domain: Account -> Domains -> Add a domain, point
    the nameservers InfinityFree shows you, then run the https://example.com
@@ -282,6 +343,15 @@ These ship with the current files - no extra setup needed beyond uploading:
   - **Motion:** scroll-reveal uses `IntersectionObserver` (adds `data-reveal`
     elements), and both scroll reveal and all animations are disabled for
     users who set `prefers-reduced-motion`.
+  - **Live design layer (CSS + a few lines of JS):** slowly drifting ambient
+    aurora orbs, a rotating hero orbit, a breathing glow around the hero logo,
+    gradient-shimmer headline accents, a one-time shine sweep across cards and
+    buttons on hover, pulsing "live/brew" status dots, staggered scroll-reveal
+    for card grids, a thin gradient scroll-progress bar along the top, and a
+    soft gradient underline under the hero headline. All animation runs on
+    `transform`/`opacity`/`background-position` so it stays smooth on phones,
+    and the whole layer is disabled under `prefers-reduced-motion`. Orbs and
+    the progress bar are injected by `setupLiveEffects()` in `js/main.js`.
 - **RSS feed.** `feed.xml` is linked from the blog page. After editing
   `data/posts.js`, regenerate it with `node tools/generate-feed.mjs`. The feed
   reads the configured `websiteUrl` from `data/site-config.js` automatically.
@@ -299,8 +369,11 @@ These ship with the current files - no extra setup needed beyond uploading:
   `data/site-config.js` with numbers you can prove (Play Console), and the
   homepage shows them. It stays hidden until you add them - no invented figures.
 - **Roadmap (About page).** Edit the `roadmap` list in `data/site-config.js`.
-- **Per-app privacy pages.** `app-privacy.html?id=<app-id>` renders a policy
-  template for each app (linked from the app detail page). Complete every
+- **Per-app privacy pages.** `app-privacy.html?id=<app-id>` renders the saved
+  policy for each app when one exists (write it in Admin → Privacy policies),
+  or the built-in working template otherwise. The page is linked from the app
+  detail page, and the "Copy URL" button in admin gives you the exact URL to
+  paste into the Play Console as the app's Privacy Policy. Complete every
   section before the app ships - the template says it is in progress until then.
 - **Breadcrumbs** on app detail and updates pages; dynamic `og:image` per app
   for social sharing.

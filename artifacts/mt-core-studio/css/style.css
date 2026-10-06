@@ -842,6 +842,10 @@ body::after {
   font-size: 13px;
 }
 
+/* privacy / terms links on app detail pages (shown side by side) */
+.legal-links .legal-sep { color: var(--muted); margin: 0 2px; }
+.legal-links .text-link { white-space: nowrap; }
+
 .feature-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 11px; }
 .feature-list li {
   position: relative;

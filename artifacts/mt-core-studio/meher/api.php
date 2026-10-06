@@ -165,6 +165,37 @@ if ($action === 'save-app') {
     if ($app['name'] === '') {
         mt_json(['ok' => false, 'error' => 'App name is required.'], 400);
     }
+    $app['updatedAt'] = date('Y-m-d H:i');
+
+    /* Legal source auto-detect: when a Legal / Policy Source URL is set and one
+     * of the two policy URLs is still empty, read the source page and fill ONLY
+     * the empty fields. Existing URLs are never overwritten, and every failure
+     * is returned as a warning so the admin sees it instead of a silent save. */
+    $warnings = [];
+    $source = $app['policySourceUrl'];
+    if ($source !== '' && ($app['privacyUrl'] === '' || $app['termsUrl'] === '')) {
+        $links = mt_fetch_legal_links($source);
+        $gotPrivacy = (string) ($links['privacyUrl'] ?? '') !== '';
+        $gotTerms = (string) ($links['termsUrl'] ?? '') !== '';
+        if (!$gotPrivacy && !$gotTerms) {
+            $warnings[] = 'Could not read the legal source page (' . $source . ') — no links detected. Check the URL or enter the Privacy Policy and Terms of Service URLs manually.';
+        } else {
+            if ($app['privacyUrl'] === '') {
+                if ($gotPrivacy) {
+                    $app['privacyUrl'] = $links['privacyUrl'];
+                } else {
+                    $warnings[] = 'Privacy Policy link was not found on the source page — enter it manually.';
+                }
+            }
+            if ($app['termsUrl'] === '') {
+                if ($gotTerms) {
+                    $app['termsUrl'] = $links['termsUrl'];
+                } else {
+                    $warnings[] = 'Terms of Service link was not found on the source page — enter it manually.';
+                }
+            }
+        }
+    }
 
     $originalId = mt_clean_text($_POST['originalId'] ?? '', 200);
     $found = false;
@@ -185,7 +216,7 @@ if ($action === 'save-app') {
         mt_json(['ok' => false, 'error' => 'Could not write data/apps.js. Check that the data folder is writable by PHP.'], 500);
     }
     mt_audit('app-save', $app['name'] . ($found ? '' : ' (new)'));
-    mt_json(['ok' => true, 'apps' => $updated]);
+    mt_json(['ok' => true, 'apps' => $updated, 'warnings' => $warnings]);
 }
 
 if ($action === 'delete-app') {
@@ -263,6 +294,19 @@ if ($action === 'import-play') {
     mt_json(['ok' => true, 'info' => $info, 'iconSaved' => $iconSaved]);
 }
 
+/* Auto-fill Privacy Policy + Terms of Service URLs from one legal-pages link
+ * (e.g. https://mtcorestudio.github.io/daily-spark-privacy/). The page links
+ * to its own Privacy Policy and a Terms of Service page - both are detected. */
+if ($action === 'fetch-links') {
+    $url = mt_clean_text($_POST['url'] ?? '', 500);
+    $links = mt_fetch_legal_links($url);
+    mt_json([
+        'ok' => true,
+        'privacyUrl' => (string) ($links['privacyUrl'] ?? ''),
+        'termsUrl' => (string) ($links['termsUrl'] ?? ''),
+    ]);
+}
+
 if ($action === 'waitlist-list') {
     mt_json(['ok' => true, 'waitlist' => mt_read_waitlist()]);
 }
@@ -280,7 +324,17 @@ if ($action === 'waitlist-clear') {
 
 if ($action === 'visits-stats') {
     $stats = mt_visit_stats();
-    mt_json(['ok' => true, 'stats' => $stats['stats'], 'countries' => $stats['countries'], 'recent' => $stats['recent']]);
+    mt_json(['ok' => true, 'stats' => $stats['stats'], 'countries' => $stats['countries'], 'topPages' => $stats['topPages'], 'recent' => $stats['recent']]);
+}
+
+/* Ranged analytics for the Analytics sidebar (Overview / IP Analysis / Pages).
+ * Read-only for any signed-in account; the hashed IP rows never leave the
+ * authenticated console. */
+if ($action === 'analytics') {
+    $range = strtolower(mt_clean_text($_POST['range'] ?? '30', 10));
+    $payload = mt_analytics($range);
+    $payload['ok'] = true;
+    mt_json($payload);
 }
 
 if ($action === 'visits-clear') {
@@ -288,7 +342,8 @@ if ($action === 'visits-clear') {
         mt_json(['ok' => false, 'error' => 'Could not clear data/visits.js. Check file permissions.'], 500);
     }
     mt_audit('visits-clear', '');
-    mt_json(['ok' => true, 'stats' => mt_visit_stats()['stats'], 'countries' => []]);
+    $fresh = mt_visit_stats();
+    mt_json(['ok' => true, 'stats' => $fresh['stats'], 'countries' => [], 'topPages' => [], 'recent' => []]);
 }
 
 if ($action === 'visits-export') {

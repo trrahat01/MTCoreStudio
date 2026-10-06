@@ -536,10 +536,12 @@ function detailPage() {
               .join("")}</div>`
           : `<p class="detail-note">Concept previews of the interface — the final design may change before release.</p>`}
       </section>
-      <section class="detail-block"><span class="eyebrow">PRIVACY & SUPPORT</span><h2>Privacy & support</h2>
-        <p>${cleanUrl(app.privacyUrl)
-          ? `<a class="text-link" href="${escapeHTML(cleanUrl(app.privacyUrl))}" target="_blank" rel="noopener noreferrer">Read the privacy policy for ${escapeHTML(app.name)} <span aria-hidden="true">↗</span></a>`
-          : `<span class="detail-note">A completed privacy policy will be linked here before the app is published.</span>`}</p>
+      <section class="detail-block"><span class="eyebrow">PRIVACY &amp; SUPPORT</span><h2>Privacy &amp; support</h2>
+        <p class="legal-links">${cleanUrl(app.privacyUrl)
+          ? `<a class="text-link" href="${escapeHTML(cleanUrl(app.privacyUrl))}" target="_blank" rel="noopener noreferrer">Privacy Policy <span aria-hidden="true">↗</span></a>`
+          : `<span class="detail-note">A completed privacy policy will be linked here before the app is published.</span>`}${cleanUrl(app.termsUrl)
+          ? ` <span class="legal-sep" aria-hidden="true">·</span> <a class="text-link" href="${escapeHTML(cleanUrl(app.termsUrl))}" target="_blank" rel="noopener noreferrer">Terms of Service <span aria-hidden="true">↗</span></a>`
+          : ` <span class="detail-note">The terms of service will be linked here before the app is published.</span>`}</p>
         <p>Questions about ${escapeHTML(app.name)}? Visit the <a class="text-link" href="contact.html">contact page</a> or review the <a class="text-link" href="privacy.html">privacy policy</a>.</p>
       </section>
 

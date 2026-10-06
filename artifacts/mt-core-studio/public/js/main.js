@@ -184,8 +184,6 @@ function header() {
     ["Home", "index.html", "home"],
     ["Apps", "apps.html", "apps"],
     ["About", "about.html", "about"],
-    ["Developer", "developer.html", "developer"],
-    ["Publisher", "publisher.html", "publisher"],
     ["Blog", "blog.html", "blog"],
     ["Contact", "contact.html", "contact"]
   ];
@@ -270,55 +268,161 @@ function appCard(app) {
 
 /* -------------------------------- home page ------------------------------- */
 
-function homePage() {
-  const playCta = cleanUrl(siteConfig.playStoreUrl)
-    ? availableAction("View on Google Play", siteConfig.playStoreUrl)
-    : `<a class="button button-secondary" href="contact.html">Get in touch <span aria-hidden="true">→</span></a>`;
+function studioStatusPanel() {
+  const items = [
+    ["Website online", true],
+    ["Apps in development", apps.length > 0],
+    ["Continuous development", true],
+    ["New projects", true]
+  ];
+  return `<section class="section status-section"><div class="wrap">
+    <div class="section-head" data-reveal>
+      <div><span class="eyebrow">STUDIO STATUS</span><h2>A small studio, in active motion.</h2><p>A visual brand element showing MT Core Studio's current working state — it is not connected to real server monitoring.</p></div>
+    </div>
+    <div class="status-panel" data-reveal>
+      <div class="status-head">
+        <span class="status-pulse" aria-hidden="true"></span>
+        <span class="status-title">MT CORE STUDIO</span>
+        <span class="status-sub">STUDIO STATUS</span>
+        <span class="status-live" role="status">LIVE</span>
+      </div>
+      <ul class="status-list">
+        ${items.map(([label, on]) => `<li class="${on ? "is-on" : ""}"><span class="status-dot" aria-hidden="true"></span><span>${label}</span></li>`).join("")}
+      </ul>
+    </div>
+  </div></section>`;
+}
 
-  return `<section class="hero"><div class="wrap hero-grid">
-    <div class="reveal">
-      <span class="eyebrow">WELCOME TO MT CORE STUDIO</span>
-      <h1>Smart apps for a <span class="accent">better tomorrow.</span></h1>
-      <p class="hero-copy">I'm an independent Android app developer. MT Core Studio is where I design, build and publish useful applications — simple, fast tools that solve everyday problems and make digital life a little easier.</p>
+function featuredAppSection() {
+  const app = apps[0];
+  if (!app) return "";
+  const screenshots = (Array.isArray(app.screenshots) ? app.screenshots : []).filter(Boolean);
+  return `<section class="section featured-section"><div class="wrap">
+    <div class="section-head" data-reveal>
+      <div><span class="eyebrow">FEATURED APP</span><h2>${escapeHTML(app.name)}</h2><p>A closer look at the app currently leading the collection.</p></div>
+    </div>
+    <article class="featured-card" data-reveal>
+      <div class="featured-media">
+        ${iconTile(app, 120)}
+        ${screenshots.length ? `<div class="featured-shots"><img src="${escapeHTML(screenshots[0])}" alt="${escapeHTML(app.name)} preview" loading="lazy">${screenshots.length > 1 ? `<img src="${escapeHTML(screenshots[1])}" alt="${escapeHTML(app.name)} preview" loading="lazy">` : ""}</div>` : ""}
+      </div>
+      <div class="featured-copy">
+        <span class="category-pill">${escapeHTML(app.category)}</span>
+        <h3>${escapeHTML(app.name)}</h3>
+        <p>${escapeHTML(app.description || "")}</p>
+        ${isPublished(app) ? `<div class="hero-actions featured-actions">${availableAction("View on Google Play", app.playStoreUrl, true)}<a class="button button-secondary" href="app.html?id=${encodeURIComponent(app.id)}">App details <span aria-hidden="true">→</span></a></div>` : `<a class="button button-secondary" href="app.html?id=${encodeURIComponent(app.id)}">App details <span aria-hidden="true">→</span></a>`}
+      </div>
+    </article>
+  </div></section>`;
+}
+
+function ecosystemSection() {
+  const cats = ["Productivity", "Education", "Lifestyle", "Tools", "Entertainment", "Utilities"];
+  return `<section class="section ecosystem-section"><div class="wrap">
+    <div class="section-head" data-reveal>
+      <div><span class="eyebrow">APP ECOSYSTEM</span><h2>One studio, many categories.</h2><p>MT Core Studio applications span everyday categories — each one small, focused and genuinely useful.</p></div>
+    </div>
+    <div class="ecosystem" data-reveal>
+      <div class="eco-connector" aria-hidden="true"></div>
+      ${cats.map((cat, i) => `<div class="eco-node" style="--i:${i}" role="listitem" aria-label="${escapeHTML(cat)}">
+        <span class="eco-orbit" aria-hidden="true"></span>
+        <span class="eco-code" aria-hidden="true">${String(i + 1).padStart(2, "0")}</span>
+        <span class="eco-name">${escapeHTML(cat)}</span>
+      </div>`).join("")}
+    </div>
+  </div></section>`;
+}
+
+function pipelineSection() {
+  const steps = [
+    ["Idea", "A clear need, shaped into an honest plan."],
+    ["Design", "Screens and flows mapped with care."],
+    ["Develop", "Modern Android tooling, kept small and fast."],
+    ["Test", "Checked on emulators and real devices."],
+    ["Publish", "A complete, honest Play Store listing."],
+    ["Improve", "Feedback becomes the next update."]
+  ];
+  return `<section class="section pipeline-section"><div class="wrap">
+    <div class="section-head" data-reveal>
+      <div><span class="eyebrow">DEVELOPMENT PIPELINE</span><h2>From idea to Play Store.</h2><p>The full journey behind every MT Core Studio app.</p></div>
+    </div>
+    <ol class="pipeline" data-reveal>
+      ${steps.map(([name, desc], i) => `<li class="pipeline-step" style="--i:${i}">
+        <span class="pipeline-node" aria-hidden="true">${String(i + 1).padStart(2, "0")}</span>
+        <div class="pipeline-copy"><strong>${name}</strong><p>${desc}</p></div>
+      </li>`).join("")}
+    </ol>
+  </div></section>`;
+}
+
+function purposeSection() {
+  const items = [
+    ["Useful", "Applications that solve real, everyday problems."],
+    ["Simple", "Experiences that stay easy to understand."],
+    ["Modern", "Current design and technology, used with restraint."],
+    ["Performant", "Small, fast and practical — even on entry-level phones."]
+  ];
+  return `<section class="section purpose-section"><div class="wrap">
+    <div class="section-head" data-reveal>
+      <div><span class="eyebrow">BUILT WITH PURPOSE</span><h2>Principles behind every app.</h2><p>Four simple standards that shape each MT Core Studio product.</p></div>
+    </div>
+    <div class="purpose-grid" data-reveal>
+      ${items.map(([title, text], i) => `<article class="purpose-card" style="--i:${i}">
+        <span class="purpose-mark" aria-hidden="true">${String(i + 1).padStart(2, "0")}</span>
+        <h3>${title}</h3>
+        <p>${text}</p>
+      </article>`).join("")}
+    </div>
+  </div></section>`;
+}
+
+function homePage() {
+  const heroPlay = cleanUrl(siteConfig.playStoreUrl)
+    ? `<a class="button button-secondary button-google" href="${escapeHTML(cleanUrl(siteConfig.playStoreUrl))}" target="_blank" rel="noopener noreferrer">Google Play <span aria-hidden="true">↗</span></a>`
+    : `<a class="button button-secondary" href="apps.html">View the collection <span aria-hidden="true">→</span></a>`;
+
+  return `<section class="hero"><div class="hero-bg" aria-hidden="true"><canvas class="hero-canvas" data-fx="particles"></canvas><span class="hero-beam"></span></div>
+  <div class="wrap hero-grid">
+    <div class="reveal hero-lead">
+      <span class="hero-chip">MT CORE STUDIO • APP DEVELOPMENT</span>
+      <h1>BUILD. <span class="accent">INNOVATE.</span><br>SIMPLIFY.</h1>
+      <p class="hero-copy">MT Core Studio creates useful mobile applications and digital products — simple, fast Android apps that make everyday routines a little easier.</p>
       <div class="hero-actions">
         <a class="button button-primary" href="apps.html">Explore Apps <span aria-hidden="true">→</span></a>
-        ${playCta}
+        ${heroPlay}
       </div>
     </div>
     <div class="hero-visual reveal reveal-delay" aria-label="MT Core Studio brand artwork">
       <div class="hero-orbit" aria-hidden="true"></div>
       <div class="hero-logo-frame"><img src="${logo}" alt="MT Core Studio logo" width="1536" height="1024"></div>
-      <div class="visual-tag"><b>ONE DEVELOPER · ANDROID</b><span>Every app designed, built and shipped by me.</span></div>
+      <div class="visual-tag"><b>ONE DEVELOPER • ANDROID</b><span>Every app designed, built and shipped by me.</span></div>
     </div>
   </div></section>
 
   ${statsBand()}
-  <section class="feature-band" aria-label="My product principles" data-reveal><div class="wrap feature-row">
-    ${["Modern UI/UX", "Useful Applications", "Play Store Ready", "Fast & Lightweight"]
-      .map(
-        (label, i) =>
-          `<div class="feature"><span class="feature-mark" aria-hidden="true">${["01", "02", "03", "04"][i]}</span><span>${label}</span></div>`
-      )
+  <section class="feature-band" aria-label="Studio principles" data-reveal><div class="wrap feature-row">
+    ${["Useful", "Simple", "Modern", "Performant"]
+      .map((label, i) => `<div class="feature"><span class="feature-mark" aria-hidden="true">${["01", "02", "03", "04"][i]}</span><span>${label}</span></div>`)
       .join("")}
   </div></section>
 
-  <section class="section"><div class="wrap">
+  ${featuredAppSection()}
+
+  ${ecosystemSection()}
+
+  <section class="section apps-directory-section"><div class="wrap">
     <div class="section-head" data-reveal>
-      <div><span class="eyebrow">A SMALL, GROWING COLLECTION</span><h2>Apps for real routines.</h2><p>Practical Android applications built end-to-end by one developer — every one designed to make a familiar task a little easier.</p></div>
+      <div><span class="eyebrow">APPLICATION DIRECTORY</span><h2>Apps for real routines.</h2><p>A growing collection, each one built end-to-end by one developer.</p></div>
       <a class="text-link" href="apps.html">Browse all apps <span aria-hidden="true">→</span></a>
     </div>
     <div class="app-grid" data-reveal>${apps.slice(0, 3).map(appCard).join("")}</div>
   </div></section>
 
+  ${pipelineSection()}
 
-  <section class="section practice-section"><div class="wrap practice-layout">
-    <div class="practice-intro"><span class="eyebrow">A SIMPLE WORKING METHOD</span><h2>Make useful things. Make them make sense.</h2><p>Good software respects the person using it. I keep the intent close and the experience clear.</p></div>
-    <div class="practice-list" data-reveal>
-      <article class="practice-step"><span>01</span><div><h3>Start with a real need</h3><p>Look for a familiar task where a thoughtful tool can make the day a little easier.</p></div><b aria-hidden="true">↗</b></article>
-      <article class="practice-step"><span>02</span><div><h3>Build with care</h3><p>Shape the idea into an Android app with considered details and a clear interface.</p></div><b aria-hidden="true">↗</b></article>
-      <article class="practice-step"><span>03</span><div><h3>Keep simplifying</h3><p>Refine the experience so the useful part stays easy to find and easy to use.</p></div><b aria-hidden="true">↗</b></article>
-    </div>
-  </div></section>
+  ${purposeSection()}
+
+  ${studioStatusPanel()}
 
   <section class="section-tight"><div class="wrap"><div class="studio-note" data-reveal>
     <div class="studio-stamp"><img src="${logo}" alt="" width="108" height="72" loading="lazy"><span>INDEPENDENT<br>BY DESIGN</span></div>
@@ -327,14 +431,14 @@ function homePage() {
   </div></div></section>
 
   <section class="section-tight"><div class="wrap"><div class="callout" data-reveal><div class="callout-content">
-    <span class="eyebrow">BUILD · INNOVATE · SIMPLIFY</span>
+    <span class="eyebrow">BUILD • INNOVATE • SIMPLIFY</span>
     <h2>Thoughtful tools. Less friction in the day.</h2>
     <p>Every MT Core Studio app starts the same way: a simple question — can this make a familiar task easier to handle?</p>
     <a href="about.html" class="button button-secondary">Get to know the developer <span aria-hidden="true">→</span></a>
   </div></div></section>`;
 }
 
-/* --------------------------------- apps page ------------------------------ */
+
 
 function appsPage() {
   return `<section class="page-intro"><div class="wrap">
@@ -432,10 +536,12 @@ function detailPage() {
               .join("")}</div>`
           : `<p class="detail-note">Concept previews of the interface — the final design may change before release.</p>`}
       </section>
-      <section class="detail-block"><span class="eyebrow">PRIVACY & SUPPORT</span><h2>Privacy & support</h2>
-        <p>${cleanUrl(app.privacyUrl)
-          ? `<a class="text-link" href="${escapeHTML(cleanUrl(app.privacyUrl))}" target="_blank" rel="noopener noreferrer">Read the privacy policy for ${escapeHTML(app.name)} <span aria-hidden="true">↗</span></a>`
-          : `<span class="detail-note">A completed privacy policy will be linked here before the app is published.</span>`}</p>
+      <section class="detail-block"><span class="eyebrow">PRIVACY &amp; SUPPORT</span><h2>Privacy &amp; support</h2>
+        <p class="legal-links">${cleanUrl(app.privacyUrl)
+          ? `<a class="text-link" href="${escapeHTML(cleanUrl(app.privacyUrl))}" target="_blank" rel="noopener noreferrer">Privacy Policy <span aria-hidden="true">↗</span></a>`
+          : `<span class="detail-note">A completed privacy policy will be linked here before the app is published.</span>`}${cleanUrl(app.termsUrl)
+          ? ` <span class="legal-sep" aria-hidden="true">·</span> <a class="text-link" href="${escapeHTML(cleanUrl(app.termsUrl))}" target="_blank" rel="noopener noreferrer">Terms of Service <span aria-hidden="true">↗</span></a>`
+          : ` <span class="detail-note">The terms of service will be linked here before the app is published.</span>`}</p>
         <p>Questions about ${escapeHTML(app.name)}? Visit the <a class="text-link" href="contact.html">contact page</a> or review the <a class="text-link" href="privacy.html">privacy policy</a>.</p>
       </section>
 
@@ -1033,6 +1139,157 @@ function browserCountryCode() {
     .catch(() => fallback(""));
 }
 
+/* ------------------------------ live visual effects ------------------------ */
+
+function setupHeroCanvas() {
+  const canvas = document.querySelector(".hero-canvas");
+  if (!canvas) return;
+  if (prefersReducedMotion()) return;
+  if (!canvas.getContext) return;
+  // Desktop only: touch devices use reduced effects.
+  if (window.matchMedia && !window.matchMedia("(hover: hover)").matches) return;
+  const reducing = () => prefersReducedMotion();
+  const isMobile = window.innerWidth < 768;
+  const ctx = canvas.getContext("2d");
+  const DPR = Math.min(2, window.devicePixelRatio || 1);
+  let particles = [];
+  let w = 0;
+  let h = 0;
+
+  const resize = () => {
+    const hero = canvas.closest(".hero");
+    w = hero ? hero.getBoundingClientRect().width : window.innerWidth;
+    h = hero ? hero.getBoundingClientRect().height : 420;
+    canvas.width = Math.round(w * DPR);
+    canvas.height = Math.round(h * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    const count = isMobile ? 16 : 42;
+    particles = Array.from({ length: count }, () => ({
+      x: Math.random() * w,
+      y: Math.random() * h,
+      r: 0.6 + Math.random() * 1.6,
+      vx: (Math.random() - 0.5) * 0.22,
+      vy: (Math.random() - 0.5) * 0.22,
+      a: 0.12 + Math.random() * 0.3
+    }));
+  };
+
+  const draw = () => {
+    if (reducing()) return;
+    ctx.clearRect(0, 0, w, h);
+    // connecting lines
+    ctx.strokeStyle = "rgba(56, 220, 255, 0.14)";
+    ctx.lineWidth = 1;
+    for (let i = 0; i < particles.length; i++) {
+      for (let j = i + 1; j < particles.length; j++) {
+        const dx = particles[i].x - particles[j].x;
+        const dy = particles[i].y - particles[j].y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < 120 * 120) {
+          ctx.globalAlpha = 0.5 * (1 - Math.sqrt(d2) / 120);
+          ctx.beginPath();
+          ctx.moveTo(particles[i].x, particles[i].y);
+          ctx.lineTo(particles[j].x, particles[j].y);
+          ctx.stroke();
+        }
+      }
+    }
+    // particles
+    for (const p of particles) {
+      p.x += p.vx;
+      p.y += p.vy;
+      if (p.x < -8) p.x = w + 8;
+      if (p.x > w + 8) p.x = -8;
+      if (p.y < -8) p.y = h + 8;
+      if (p.y > h + 8) p.y = -8;
+      ctx.globalAlpha = p.a;
+      ctx.fillStyle = "rgba(120, 190, 255, 0.9)";
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    requestAnimationFrame(draw);
+  };
+
+  resize();
+  window.addEventListener("resize", resize, { passive: true });
+  requestAnimationFrame(draw);
+}
+
+function setupMouseGlow() {
+  // The glow element is harmless when hidden (-2000px off-screen), so it is
+  // always created. Only the pointer listener is hover-gated (desktop only).
+  const hero = document.querySelector(".hero");
+  if (!hero) return;
+  const glow = document.createElement("span");
+  glow.className = "mouse-glow";
+  glow.setAttribute("aria-hidden", "true");
+  hero.appendChild(glow);
+
+  if (prefersReducedMotion()) return;
+  if (window.matchMedia && !window.matchMedia("(hover: hover)").matches) return;
+
+  let tx = -999;
+  let ty = -999;
+  let x = -999;
+  let y = -999;
+  let moving = false;
+
+  window.addEventListener(
+    "pointermove",
+    (event) => {
+      const rect = hero.getBoundingClientRect();
+      tx = event.clientX - rect.left;
+      ty = event.clientY - rect.top;
+      moving = true;
+    },
+    { passive: true }
+  );
+
+  const step = () => {
+    x += (tx - x) * 0.12;
+    y += (ty - y) * 0.12;
+    const scale = moving ? 1 : 0.4;
+    glow.style.transform = `translate(${x - 140}px, ${y - 140}px) scale(${scale})`;
+    requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+function setupLiveEffects() {
+  // Ambient orbs (pure decoration, aria-hidden).
+  try {
+    const orbA = document.createElement("div");
+    orbA.className = "orb orb-a";
+    orbA.setAttribute("aria-hidden", "true");
+    const orbB = document.createElement("div");
+    orbB.className = "orb orb-b";
+    orbB.setAttribute("aria-hidden", "true");
+    document.body.appendChild(orbA);
+    document.body.appendChild(orbB);
+  } catch (e) { /* decorative only */ }
+
+  setupHeroCanvas();
+  setupMouseGlow();
+
+  // Scroll progress bar.
+  try {
+    const bar = document.createElement("div");
+    bar.className = "scroll-progress";
+    bar.setAttribute("aria-hidden", "true");
+    document.body.appendChild(bar);
+    const update = () => {
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      const pct = max > 0 ? (window.scrollY / max) * 100 : 0;
+      bar.style.width = `${Math.min(100, Math.max(0, pct))}%`;
+    };
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+  } catch (e) { /* decorative only */ }
+}
+
 /* ---------------------------------- boot ---------------------------------- */
 
 const renderers = {
@@ -1058,10 +1315,7 @@ setupDirectory();
 setupWaitlist();
 setupScrollReveal();
 setupHeaderState();
+setupLiveEffects();
 registerServiceWorker();
 trackVisit();
-setupNavigation();
-setupDirectory();
-setupWaitlist();
-registerServiceWorker();
 

@@ -8,6 +8,77 @@
   var mtCanWrite = mtRole !== 'viewer';
   var mtIsOwner = mtRole === 'owner';
 
+  /* ------------------------------ sidebar / views ------------------------- */
+
+  var lastView = 'dashboard';
+  var currentView = '';
+
+  function switchView(name) {
+    var all = Array.prototype.slice.call(document.querySelectorAll('[data-view]'));
+    var wanted = all.filter(function (v) { return v.getAttribute('data-view') === name; });
+    all.forEach(function (v) {
+      v.style.display = v === (wanted[0] || null) ? '' : 'none';
+    });
+    Array.prototype.slice.call(document.querySelectorAll('.nav-link[data-nav]')).forEach(function (a) {
+      a.classList.remove('active');
+      if (a.getAttribute('data-nav') === name) a.classList.add('active');
+    });
+    currentView = name;
+    document.body.classList.remove('nav-open');
+    var scrim = document.getElementById('nav-scrim');
+    if (scrim) scrim.hidden = true;
+    var main = document.querySelector('main.content');
+    if (main) main.scrollTop = 0;
+    if (window.scrollTo) { window.scrollTo(0, 0); }
+  }
+
+  function onNav(name) {
+    if (name === 'analytics' || name === 'ip-analysis' || name === 'pages') {
+      refreshAnalytics();
+    }
+  }
+
+  function wireSidebar() {
+    if (!MT_LOGGED_IN) return;
+    Array.prototype.slice.call(document.querySelectorAll('.nav-link[data-nav]')).forEach(function (a) {
+      a.addEventListener('click', function (e) {
+        e.preventDefault();
+        var name = a.getAttribute('data-nav');
+        if (name === 'pass') { lastView = currentView || 'dashboard'; }
+        if (name === 'app-edit') { openNewEditor(); return; }
+        switchView(name);
+        onNav(name);
+      });
+    });
+    Array.prototype.slice.call(document.querySelectorAll('[data-view]')).forEach(function (v) { v.style.display = 'none'; });
+    switchView('dashboard');
+    var toggle = $('nav-toggle');
+    if (toggle) {
+      toggle.addEventListener('click', function () {
+        if (window.matchMedia('(max-width: 900px)').matches) {
+          var open = document.body.classList.toggle('nav-open');
+          var scrim = $('nav-scrim');
+          if (scrim) scrim.hidden = !open;
+        } else {
+          document.body.classList.toggle('nav-collapsed');
+        }
+      });
+    }
+    var scrim = $('nav-scrim');
+    if (scrim) {
+      scrim.addEventListener('click', function () {
+        document.body.classList.remove('nav-open');
+        scrim.hidden = true;
+      });
+    }
+    var sideLogout = $('btn-logout-side');
+    if (sideLogout) {
+      sideLogout.addEventListener('click', function () {
+        api('logout').then(function () { window.location.reload(); });
+      });
+    }
+  }
+
   function encodeUTF8(value) {
     return btoa(unescape(encodeURIComponent(String(value))));
   }
@@ -87,13 +158,6 @@
 
   var appImage;
 
-  function statusPillClass(status) {
-    var s = String(status || '').toLowerCase();
-    if (s.indexOf('publish') !== -1) return 'status-live';
-    if (s.indexOf('develop') !== -1 || s.indexOf('beta') !== -1) return 'status-brew';
-    return '';
-  }
-
   function esc(value) {
     var div = document.createElement('div');
     div.textContent = String(value);
@@ -101,40 +165,62 @@
   }
   function escAttr(value) { return esc(value).replace(/"/g, '&quot;'); }
 
+  var APP_STATUSES = ['Status to be confirmed', 'In development', 'Published'];
+
+  function monogramOf(name) {
+    return String(name).split(/\s+/).slice(0, 2).map(function (w) { return (w[0] || '').toUpperCase(); }).join('');
+  }
+
+  function policyChips(app) {
+    var priv = String(app.privacyUrl || '');
+    var terms = String(app.termsUrl || '');
+    return '<span class="pol-chip ' + (priv ? 'ok' : 'bad') + '" title="' + escAttr(priv || 'Not set — use the Legal / Policy Source URL in the app editor') + '">' + (priv ? '✓ Privacy' : '✗ Privacy') + '</span>' +
+      '<span class="pol-chip ' + (terms ? 'ok' : 'bad') + '" title="' + escAttr(terms || 'Not set — use the Legal / Policy Source URL in the app editor') + '">' + (terms ? '✓ Terms' : '✗ Terms') + '</span>';
+  }
+
   function renderApps(apps) {
     var list = $('apps-list');
     appImage = apps || [];
+    renderCategories(appImage);
     if (!list) return;
     if (!apps.length) {
       list.innerHTML = '<p class="muted">No apps yet. Click “+ New app” to add your first app.</p>';
       return;
     }
-    list.innerHTML = apps.map(function (app) {
+    var head = '<div class="table-wrap"><table class="data-table apps-table">' +
+      '<thead><tr><th>Icon</th><th>App</th><th>Package</th><th>Category</th><th>Status</th><th>Policy</th><th>Updated</th><th>Actions</th></tr></thead><tbody>';
+    var body = apps.map(function (app) {
       var id = String(app.id || '');
       var name = String(app.name || 'Unnamed app');
-      var cat = String(app.category || '—');
       var status = String(app.status || 'Status to be confirmed');
-      var desc = String(app.description || '').slice(0, 110);
-      if (desc.length === 110) desc += '…';
-      var monogram = name.split(/\s+/).slice(0, 2).map(function (w) { return (w[0] || '').toUpperCase(); }).join('');
-      return (
-        '<div class="app-row">' +
-          '<div class="app-row-icon" aria-hidden="true">' + esc(monogram) + '</div>' +
-          '<div class="app-row-info">' +
-            '<strong>' + esc(name) + '</strong>' +
-            '<span class="muted">' + esc(cat) + ' · ' + esc(id) + (desc ? ' — ' + esc(desc) : '') + '</span>' +
-            '<span class="app-row-status ' + statusPillClass(status) + '">' + esc(status) + '</span>' +
-          '</div>' +
-          '<div class="app-row-actions">' +
-            '<button class="btn btn-sm" type="button" data-act="edit" data-id="' + escAttr(id) + '">Edit</button>' +
-            '<button class="btn btn-sm btn-danger" type="button" data-act="delete" data-id="' + escAttr(id) + '">Delete</button>' +
-          '</div>' +
-        '</div>'
-      );
+      var iconCell = app.icon
+        ? '<img class="table-icon" src="' + escAttr(String(app.icon)) + '" alt="">'
+        : '<div class="app-row-icon table-mono" aria-hidden="true">' + esc(monogramOf(name)) + '</div>';
+      var options = APP_STATUSES.map(function (s) {
+        return '<option' + (s === status ? ' selected' : '') + '>' + esc(s) + '</option>';
+      }).join('');
+      return '<tr>' +
+        '<td>' + iconCell + '</td>' +
+        '<td><div class="cell-stack"><strong>' + esc(name) + '</strong><span class="muted mono-id">' + esc(id) + '</span></div></td>' +
+        '<td class="cell-pkg">' + esc(String(app.packageName || '—')) + '</td>' +
+        '<td>' + esc(String(app.category || '—')) + '</td>' +
+        '<td><select class="status-select" data-act="status" data-id="' + escAttr(id) + '" aria-label="Status for ' + escAttr(name) + '">' + options + '</select></td>' +
+        '<td>' + policyChips(app) + '</td>' +
+        '<td class="muted">' + esc(String(app.updatedAt || '—')) + '</td>' +
+        '<td><div class="cell-actions">' +
+          '<button class="btn btn-sm" type="button" data-act="edit" data-id="' + escAttr(id) + '">Edit</button>' +
+          '<a class="btn btn-sm btn-ghost" href="../app.html?id=' + encodeURIComponent(id) + '" target="_blank" rel="noopener">View</a>' +
+          '<button class="btn btn-sm btn-danger" type="button" data-act="delete" data-id="' + escAttr(id) + '">Delete</button>' +
+        '</div></td>' +
+      '</tr>';
     }).join('');
+    list.innerHTML = head + body + '</tbody></table></div>';
 
     list.querySelectorAll('button[data-act="edit"]').forEach(function (btn) {
       btn.addEventListener('click', function () { openEditor(btn.getAttribute('data-id')); });
+    });
+    list.querySelectorAll('select[data-act="status"]').forEach(function (sel) {
+      sel.addEventListener('change', function () { quickStatus(sel.getAttribute('data-id'), sel.value); });
     });
     list.querySelectorAll('button[data-act="delete"]').forEach(function (btn) {
       btn.addEventListener('click', function () {
@@ -150,6 +236,60 @@
             .catch(function (err) { setStatus($('apps-status'), err.message, false); });
         }
       });
+    });
+  }
+  /* Quick status change from the Apps table: send the full stored record with
+   * only the status replaced, so a partial write can never lose other fields. */
+  function quickStatus(id, status) {
+    var app = null;
+    for (var i = 0; i < appImage.length; i++) {
+      if (String(appImage[i].id) === String(id)) { app = appImage[i]; break; }
+    }
+    if (!app) return;
+    var payload = JSON.parse(JSON.stringify(app));
+    payload.status = status;
+    setStatus($('apps-status'), 'Saving status…');
+    api('save-app', { originalId: String(id), app: JSON.stringify(payload) })
+      .then(function (json) {
+        if (siteData) { siteData.apps = json.apps; renderPolicies(json.apps, siteData.policies || {}); renderChecklist(siteData); }
+        renderApps(json.apps);
+        var msg = 'Status for “' + String(app.name) + '” → ' + status + '. Saved — refresh the public website to see it.';
+        if (json.warnings && json.warnings.length) {
+          setStatus($('apps-status'), msg + ' Warning: ' + json.warnings.join(' '), false);
+        } else {
+          setStatus($('apps-status'), msg, true);
+        }
+      })
+      .catch(function (err) {
+        setStatus($('apps-status'), err.message, false);
+        renderApps(appImage);
+      });
+  }
+
+  function renderCategories(apps) {
+    var el = $('categories-list');
+    if (!el) return;
+    if (!apps || !apps.length) {
+      el.innerHTML = '<p class="muted">Add an app first — categories appear here automatically.</p>';
+      return;
+    }
+    var groups = {};
+    apps.forEach(function (a) {
+      var c = String(a.category || '').trim() || 'Uncategorized';
+      if (!groups[c]) groups[c] = [];
+      groups[c].push(a);
+    });
+    el.innerHTML = Object.keys(groups).sort().map(function (c) {
+      var rows = groups[c];
+      return '<div class="cat-group">' +
+        '<div class="cat-head"><strong>' + esc(c) + '</strong><span class="muted">' + rows.length + ' app' + (rows.length === 1 ? '' : 's') + '</span></div>' +
+        '<div class="cat-chips">' + rows.map(function (a) {
+          return '<button class="cat-chip" type="button" data-id="' + escAttr(String(a.id)) + '">' + esc(String(a.name || a.id)) + ' <span class="muted">' + esc(String(a.status || '')) + '</span></button>';
+        }).join('') + '</div>' +
+      '</div>';
+    }).join('');
+    el.querySelectorAll('.cat-chip').forEach(function (btn) {
+      btn.addEventListener('click', function () { openEditor(btn.getAttribute('data-id')); });
     });
   }
   function fillSettings(config) {
@@ -170,7 +310,7 @@
   function openEditor(id) {
     var editor = $('editor');
     editor.hidden = false;
-    editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    switchView('app-edit');
     $('editor-title').textContent = id ? 'Edit app' : 'Add a new app';
 
     var source = {};
@@ -187,24 +327,28 @@
     $('f-package').value = source.packageName || '';
     $('f-play-url').value = source.playStoreUrl || '';
     $('f-privacy-url').value = source.privacyUrl || '';
+    $('f-terms-url').value = source.termsUrl || '';
+    $('f-policy-source').value = source.policySourceUrl || '';
     $('f-icon').value = source.icon || '';
     $('f-description').value = source.description || '';
     $('f-features').value = (source.features || []).join('\n');
     $('f-screenshots').value = (source.screenshots || []).join('\n');
     $('import-url').value = source.playStoreUrl || '';
     setStatus($('import-status'), '');
+    setStatus($('legal-status'), '');
     setStatus($('save-status'), '');
   }
 
   function openNewEditor() {
     var editor = $('editor');
     editor.hidden = false;
-    editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    switchView('app-edit');
     $('editor-title').textContent = 'Add a new app';
-    ['f-original-id', 'f-name', 'f-category', 'f-id', 'f-package', 'f-play-url', 'f-privacy-url', 'f-icon', 'f-description', 'f-features', 'f-screenshots', 'import-url']
+    ['f-original-id', 'f-name', 'f-category', 'f-id', 'f-package', 'f-play-url', 'f-privacy-url', 'f-terms-url', 'f-policy-source', 'f-icon', 'f-description', 'f-features', 'f-screenshots', 'import-url']
       .forEach(function (field) { $(field).value = ''; });
     $('f-status').value = 'Status to be confirmed';
     setStatus($('import-status'), '');
+    setStatus($('legal-status'), '');
     setStatus($('save-status'), '');
   }
 
@@ -219,6 +363,8 @@
         packageName: $('f-package').value,
         playStoreUrl: $('f-play-url').value,
         privacyUrl: $('f-privacy-url').value,
+        termsUrl: $('f-terms-url').value,
+        policySourceUrl: $('f-policy-source').value,
         icon: $('f-icon').value,
         description: $('f-description').value,
         features: $('f-features').value.split('\n').filter(Boolean),
@@ -285,7 +431,7 @@
     return names[String(code).toUpperCase()] || String(code).toUpperCase() || 'Unknown';
   }
 
-  function renderVisits(stats, countries, recent) {
+  function renderVisits(stats, countries, recent, topPages) {
     var el = $('visits-stats');
     if (!el) return;
     var s = stats || {};
@@ -299,30 +445,319 @@
       '<div class="stat-tile"><b>' + (s.yesterday || 0) + '</b><span>Yesterday</span></div>' +
       '<div class="stat-tile"><b>' + (s.week || 0) + '</b><span>Last 7 days</span></div>' +
       '<div class="stat-tile"><b>' + (s.month || 0) + '</b><span>Last 30 days</span></div>' +
+      '<div class="stat-tile"><b>' + (s.unique || 0) + '</b><span>Unique visitors</span></div>' +
+      '<div class="stat-tile"><b>' + (s.newMembers || 0) + '</b><span>First-time</span></div>' +
+      '<div class="stat-tile"><b>' + (s.returning || 0) + '</b><span>Returning</span></div>' +
+      '<div class="stat-tile"><b>' + total + '</b><span>All time</span></div>' +
       '</div>';
 
-    var countryRows = '';
-    var entries = Object.keys(countries || {}).slice(0, 10);
-    if (entries.length) {
-      var top = entries[0];
-      var max = countries[top] || 1;
-      countryRows = '<div class="country-list">' + entries.map(function (code) {
-        var count = countries[code] || 0;
-        var pct = Math.round((count / max) * 100);
-        var label = code === '??' ? 'Unknown' : countryName(code);
-        return '<div class="country-row">' +
-          '<span class="country-flag">' + esc(label.slice(0, 2).toUpperCase()) + '</span>' +
-          '<span class="country-name">' + esc(label) + '</span>' +
-          '<span class="country-bar"><i style="width:' + pct + '%"></i></span>' +
-          '<span class="country-count">' + count + '</span>' +
+    var pages = topPages || [];
+    var pageRows = '';
+    if (pages.length) {
+      var pMax = pages[0] ? pages[0].count : 1;
+      pageRows = '<div class="page-list">' + pages.map(function (p) {
+        var count = p.count || 0;
+        var pct = Math.round((count / pMax) * 100);
+        return '<div class="page-row">' +
+          '<span class="page-path">' + esc(String(p.page || '/')) + '</span>' +
+          '<span class="page-bar"><i style="width:' + pct + '%"></i></span>' +
+          '<span class="page-count">' + count + '</span>' +
           '</div>';
       }).join('') + '</div>';
     }
 
+    var countryRows = countryRowsHtml(countries);
+
     el.innerHTML = statRow +
+      (pageRows ? '<p class="muted" style="margin-top:14px">Most viewed pages:</p>' + pageRows : '') +
       '<p class="muted" style="margin-top:14px">Top countries (approximate, from the visit beacon):</p>' + countryRows;
   }
 
+  /* --------------------------- dashboard + analytics ----------------------- */
+
+  var lastVisits = null;
+
+  function statTile(value, label, textTile) {
+    return '<div class="stat-tile' + (textTile ? ' tile-wide' : '') + '"><b class="' + (textTile ? 'tile-text' : '') + '">' + esc(String(value)) + '</b><span>' + esc(label) + '</span></div>';
+  }
+
+  function renderDashboard(apps, visits) {
+    if (visits) lastVisits = visits;
+    var el = $('dash-stats');
+    if (!el) return;
+    var list = apps || [];
+    var published = 0;
+    list.forEach(function (a) { if (/published/i.test(String(a.status || ''))) published++; });
+    var s = (lastVisits && lastVisits.stats) || {};
+    var topPages = (lastVisits && lastVisits.topPages) || [];
+    var most = topPages.length ? String(topPages[0].page) : 'No data available';
+    el.innerHTML =
+      statTile(list.length, 'Total apps') +
+      statTile(published, 'Published apps') +
+      statTile(list.length - published, 'Draft apps') +
+      statTile(s.total || 0, 'Total visitors') +
+      statTile(s.today || 0, "Today's visitors") +
+      statTile(s.unique || 0, 'Unique visitors') +
+      statTile(s.total || 0, 'Page views') +
+      statTile(most, 'Most visited page', true);
+  }
+
+  /* ------------------------------ analytics ------------------------------- */
+
+  var analyticsCache = {};
+  var analyticsRanges = { analytics: '30', ips: '30', pages: '30' };
+  var ipState = { page: 1, size: 15 };
+  var pagesState = { sort: 'views', dir: -1 };
+
+  function currentAnalytics(key) {
+    return analyticsCache[analyticsRanges[key]] || null;
+  }
+
+  function ensureAnalytics(range) {
+    if (analyticsCache[range]) return Promise.resolve(analyticsCache[range]);
+    return api('analytics', { range: range }).then(function (json) {
+      analyticsCache[range] = json;
+      return json;
+    });
+  }
+
+  function updateRangeButtons() {
+    Array.prototype.slice.call(document.querySelectorAll('.range-group')).forEach(function (group) {
+      var key = group.getAttribute('data-range-for');
+      Array.prototype.slice.call(group.querySelectorAll('.range-btn')).forEach(function (btn) {
+        btn.classList.toggle('active', btn.getAttribute('data-range') === analyticsRanges[key]);
+      });
+    });
+  }
+
+  function refreshAnalytics() {
+    setStatus($('an-status'), 'Loading…');
+    Promise.all([
+      ensureAnalytics(analyticsRanges.analytics),
+      ensureAnalytics(analyticsRanges.ips),
+      ensureAnalytics(analyticsRanges.pages)
+    ])
+      .then(function (all) {
+        setStatus($('an-status'), '');
+        updateRangeButtons();
+        renderAnalytics(all[0]);
+        renderIpAnalysis(all[1]);
+        renderPages(all[2]);
+      })
+      .catch(function (err) {
+        setStatus($('an-status'), err.message, false);
+        setStatus($('ip-status'), err.message, false);
+        setStatus($('pages-status'), err.message, false);
+      });
+  }
+
+  function emptyBox(text) { return '<p class="muted">' + esc(text || 'No data available') + '</p>'; }
+
+  function renderTrend(el, trend) {
+    if (!el) return;
+    if (!trend || !trend.length) { el.innerHTML = emptyBox(); return; }
+    var max = 1;
+    trend.forEach(function (p) { if (p.n > max) max = p.n; });
+    var w = 100 / trend.length;
+    var bars = trend.map(function (p, i) {
+      var h = p.n > 0 ? Math.max((p.n / max) * 36, 1.5) : 0.4;
+      return '<rect class="bar" x="' + (i * w).toFixed(3) + '" y="' + (40 - h).toFixed(2) + '" width="' + Math.max(w - 0.35, 0.35).toFixed(3) + '" height="' + h.toFixed(2) + '" rx="0.3"><title>' + esc(p.d + ' — ' + p.n + ' visit' + (p.n === 1 ? '' : 's')) + '</title></rect>';
+    }).join('');
+    el.innerHTML = '<svg class="trend-svg" viewBox="0 0 100 40" preserveAspectRatio="none" role="img" aria-label="Daily visits">' + bars + '</svg>' +
+      '<div class="chart-axis"><span>' + esc(trend[0].d) + '</span><span>' + esc(trend[trend.length - 1].d) + '</span></div>';
+  }
+
+  function renderMix(el, s) {
+    if (!el) return;
+    var newIps = s.newIps || 0;
+    var ret = s.returningIps || 0;
+    var sum = newIps + ret;
+    if (!sum) { el.innerHTML = emptyBox(); return; }
+    var newPct = Math.round((newIps / sum) * 100);
+    el.innerHTML =
+      '<div class="mix-bar">' +
+        '<i class="seg-new" style="width:' + newPct + '%"></i>' +
+        '<i class="seg-ret" style="width:' + (100 - newPct) + '%"></i>' +
+      '</div>' +
+      '<div class="mix-legend">' +
+        '<span><i class="dot dot-new"></i>New IPs (first time): <strong>' + newIps + '</strong></span>' +
+        '<span><i class="dot dot-ret"></i>Returning / same IPs: <strong>' + ret + '</strong></span>' +
+        '<span><i class="dot dot-rep"></i>Repeated (2+ visits in range): <strong>' + (s.repeatedIps || 0) + '</strong></span>' +
+      '</div>';
+  }
+
+  function countryRowsHtml(countries) {
+    var entries = Object.keys(countries || {}).slice(0, 10);
+    if (!entries.length) return emptyBox();
+    var top = entries[0];
+    var max = countries[top] || 1;
+    return '<div class="country-list">' + entries.map(function (code) {
+      var count = countries[code] || 0;
+      var pct = Math.round((count / max) * 100);
+      var label = code === '??' ? 'Unknown' : countryName(code);
+      return '<div class="country-row">' +
+        '<span class="country-flag">' + esc(label.slice(0, 2).toUpperCase()) + '</span>' +
+        '<span class="country-name">' + esc(label) + '</span>' +
+        '<span class="country-bar"><i style="width:' + pct + '%"></i></span>' +
+        '<span class="country-count">' + count + '</span>' +
+        '</div>';
+    }).join('') + '</div>';
+  }
+
+  function renderAnalytics(data) {
+    var el = $('an-stats');
+    if (!el || !data) return;
+    var s = data.stats || {};
+    var topPage = (data.pages && data.pages.length) ? String(data.pages[0].page) : 'No data available';
+    el.innerHTML =
+      statTile(s.visits || 0, 'Visits in range') +
+      statTile(s.unique || 0, 'Unique visitors') +
+      statTile(s.newIps || 0, 'New IPs') +
+      statTile(s.returningIps || 0, 'Returning IPs') +
+      statTile(s.repeatedIps || 0, 'Repeated IPs') +
+      statTile(topPage, 'Top page', true);
+
+    renderTrend($('an-trend'), data.trend);
+    renderMix($('an-mix'), s);
+
+    var pg = $('an-pages');
+    if (pg) {
+      var pages = (data.pages || []).slice(0, 5);
+      if (!pages.length) {
+        pg.innerHTML = emptyBox();
+      } else {
+        var maxV = pages[0].views || 1;
+        pg.innerHTML = pages.map(function (p) {
+          var pct = Math.round(((p.views || 0) / maxV) * 100);
+          return '<div class="page-row"><span class="page-path">' + esc(String(p.page)) + '</span><span class="page-bar"><i style="width:' + pct + '%"></i></span><span class="page-count">' + (p.views || 0) + '</span></div>';
+        }).join('');
+      }
+    }
+
+    var cg = $('an-countries');
+    if (cg) cg.innerHTML = countryRowsHtml(data.countries);
+  }
+
+  function renderIpAnalysis(data) {
+    var el = $('ip-summary');
+    if (!el || !data) return;
+    var s = data.stats || {};
+    el.innerHTML =
+      statTile(s.visits || 0, 'Total visits') +
+      statTile(s.unique || 0, 'Unique IPs') +
+      statTile(s.newIps || 0, 'New IPs') +
+      statTile(s.returningIps || 0, 'Returning IPs') +
+      statTile(s.repeatedIps || 0, 'Repeated IPs');
+
+    var rows = data.ips || [];
+    var qEl = $('ip-search');
+    var q = qEl ? String(qEl.value || '').toLowerCase().trim() : '';
+    var filtered = q ? rows.filter(function (r) { return String(r.id).toLowerCase().indexOf(q) !== -1; }) : rows;
+
+    var count = $('ip-count');
+    var table = $('ip-table');
+    var pager = $('ip-pager');
+    if (!table) return;
+    if (!filtered.length) {
+      if (count) count.textContent = '';
+      table.innerHTML = emptyBox('No hashed visitors in this range.');
+      if (pager) pager.innerHTML = '';
+      return;
+    }
+    var totalPages = Math.max(1, Math.ceil(filtered.length / ipState.size));
+    if (ipState.page > totalPages) ipState.page = totalPages;
+    if (ipState.page < 1) ipState.page = 1;
+    var start = (ipState.page - 1) * ipState.size;
+    var slice = filtered.slice(start, start + ipState.size);
+
+    if (count) count.textContent = 'Showing ' + (start + 1) + '–' + (start + slice.length) + ' of ' + filtered.length + ' visitor hashes';
+    table.innerHTML = '<div class="table-wrap"><table class="data-table">' +
+      '<thead><tr><th>Visitor (hashed)</th><th>Visits</th><th>First seen</th><th>Last seen</th><th>Type</th></tr></thead><tbody>' +
+      slice.map(function (r) {
+        var badges = '<span class="ip-badge ' + (r.isNew ? 'new' : 'ret') + '">' + (r.isNew ? 'New address' : 'Same address') + '</span>';
+        if ((r.visits || 0) >= 2) badges += ' <span class="ip-badge rep">Repeated</span>';
+        return '<tr>' +
+          '<td><code>' + esc(String(r.id)) + '</code></td>' +
+          '<td>' + (r.visits || 0) + '</td>' +
+          '<td class="muted">' + esc(String(r.first)) + '</td>' +
+          '<td class="muted">' + esc(String(r.last)) + '</td>' +
+          '<td>' + badges + '</td>' +
+        '</tr>';
+      }).join('') + '</tbody></table></div>';
+
+    if (pager) {
+      pager.innerHTML =
+        '<button class="btn btn-sm" type="button" data-step="-1"' + (ipState.page <= 1 ? ' disabled' : '') + '>← Prev</button>' +
+        '<span class="muted">Page ' + ipState.page + ' of ' + totalPages + '</span>' +
+        '<button class="btn btn-sm" type="button" data-step="1"' + (ipState.page >= totalPages ? ' disabled' : '') + '>Next →</button>';
+      Array.prototype.slice.call(pager.querySelectorAll('button[data-step]')).forEach(function (b) {
+        b.addEventListener('click', function () {
+          ipState.page += parseInt(b.getAttribute('data-step'), 10) || 0;
+          renderIpAnalysis(currentAnalytics('ips'));
+        });
+      });
+    }
+  }
+
+  function renderPages(data) {
+    var el = $('pages-table');
+    if (!el || !data) return;
+    var rows = (data.pages || []).slice();
+    var qEl = $('pages-search');
+    var q = qEl ? String(qEl.value || '').toLowerCase().trim() : '';
+    if (q) rows = rows.filter(function (r) { return String(r.page).toLowerCase().indexOf(q) !== -1; });
+
+    var key = pagesState.sort;
+    rows.sort(function (a, b) {
+      var av;
+      var bv;
+      if (key === 'page') {
+        av = String(a.page).toLowerCase();
+        bv = String(b.page).toLowerCase();
+      } else {
+        av = Number(a[key] || 0);
+        bv = Number(b[key] || 0);
+      }
+      if (av === bv) return 0;
+      return (av < bv ? -1 : 1) * pagesState.dir;
+    });
+
+    var countEl = $('pages-count');
+    if (countEl) countEl.textContent = rows.length + ' page' + (rows.length === 1 ? '' : 's');
+
+    if (!rows.length) {
+      el.innerHTML = emptyBox('No page views in this range.');
+      return;
+    }
+    var th = function (col, label) {
+      var active = pagesState.sort === col;
+      return '<th><button class="th-sort' + (active ? ' active' : '') + '" type="button" data-sort="' + col + '">' +
+        esc(label) + (active ? (pagesState.dir === 1 ? ' ↑' : ' ↓') : '') + '</button></th>';
+    };
+    el.innerHTML = '<div class="table-wrap"><table class="data-table">' +
+      '<thead><tr>' + th('page', 'Page') + th('views', 'Views') + th('unique', 'Unique visitors') + th('avg', 'Avg visits') + '</tr></thead><tbody>' +
+      rows.map(function (r) {
+        return '<tr>' +
+          '<td><code>' + esc(String(r.page)) + '</code></td>' +
+          '<td><strong>' + (r.views || 0) + '</strong></td>' +
+          '<td>' + (r.unique || 0) + '</td>' +
+          '<td>' + (r.avg != null ? Number(r.avg).toFixed(1) : '—') + '</td>' +
+        '</tr>';
+      }).join('') + '</tbody></table></div>';
+
+    Array.prototype.slice.call(el.querySelectorAll('.th-sort')).forEach(function (b) {
+      b.addEventListener('click', function () {
+        var col = b.getAttribute('data-sort');
+        if (pagesState.sort === col) {
+          pagesState.dir = -pagesState.dir;
+        } else {
+          pagesState.sort = col;
+          pagesState.dir = col === 'page' ? 1 : -1;
+        }
+        renderPages(currentAnalytics('pages'));
+      });
+    });
+  }
   function wireDashboard() {
     if (!MT_LOGGED_IN) return;
 
@@ -336,6 +771,8 @@
       renderChecklist(json);
       renderUsers(json.users || []);
       renderAudit(json.audit || []);
+      renderDashboard(json.apps, null);
+      renderAuditEntries(json.audit || [], $('dash-activity'), 6);
     }).catch(function (err) {
       setStatus($('apps-status'), err.message, false);
     });
@@ -345,7 +782,7 @@
     });
 
     $('btn-new-app').addEventListener('click', openNewEditor);
-    $('btn-cancel').addEventListener('click', function () { $('editor').hidden = true; });
+    $('btn-cancel').addEventListener('click', function () { $('editor').hidden = true; switchView('apps'); });
 
     $('app-form').addEventListener('submit', function (e) {
       e.preventDefault();
@@ -355,7 +792,13 @@
           if (siteData) { siteData.apps = json.apps; renderPolicies(json.apps, siteData.policies || {}); renderChecklist(siteData); }
           renderApps(json.apps);
           $('editor').hidden = true;
-          setStatus($('apps-status'), 'App saved. It is live on the website now.', true);
+          switchView('apps');
+          var warn = json.warnings || [];
+          if (warn.length) {
+            setStatus($('apps-status'), 'Saved — but review needed: ' + warn.join(' '), false);
+          } else {
+            setStatus($('apps-status'), 'App saved. It is live on the website now.', true);
+          }
         })
         .catch(function (err) { setStatus($('save-status'), err.message, false); });
     });
@@ -375,6 +818,37 @@
           setStatus($('import-status'), 'Details filled in. Review them, then press “Save app”.', true);
         })
         .catch(function (err) { setStatus($('import-status'), err.message, false); });
+    });
+
+    $('btn-detect-legal').addEventListener('click', function () {
+      var url = $('f-policy-source').value.trim();
+      if (!url) { setStatus($('legal-status'), 'Enter the Legal / Policy Source URL first — the page that links to both policies.', false); return; }
+      setStatus($('legal-status'), 'Reading the source page…');
+      api('fetch-links', { url: url })
+        .then(function (json) {
+          var p = json.privacyUrl || '';
+          var t = json.termsUrl || '';
+          var notes = [];
+          if (p) {
+            if ($('f-privacy-url').value.trim()) { notes.push('kept your existing Privacy URL'); }
+            else { $('f-privacy-url').value = p; notes.push('Privacy Policy filled'); }
+          }
+          if (t) {
+            if ($('f-terms-url').value.trim()) { notes.push('kept your existing Terms URL'); }
+            else { $('f-terms-url').value = t; notes.push('Terms of Service filled'); }
+          }
+          var missing = [];
+          if (!p) missing.push('Privacy Policy');
+          if (!t) missing.push('Terms of Service');
+          if (!p && !t) {
+            setStatus($('legal-status'), 'Could not detect any links on that page — nothing was changed. Enter both URLs manually, then save.', false);
+          } else if (missing.length) {
+            setStatus($('legal-status'), 'Detected: ' + notes.join(', ') + '. ' + missing.join(' and ') + ' link NOT found — enter it manually before saving.', false);
+          } else {
+            setStatus($('legal-status'), 'Both links detected (' + notes.join(', ') + '). Review them, then press “Save app”.', true);
+          }
+        })
+        .catch(function (err) { setStatus($('legal-status'), err.message, false); });
     });
 
     $('settings-form').addEventListener('submit', function (e) {
@@ -434,13 +908,72 @@
       });
     }
 
-    /* ------------------------------ visitors ------------------------------ */
+    /* --------------------- visitors + dashboard stats ---------------------- */
 
-    api('visits-stats')
-      .then(function (json) {
-        renderVisits(json.stats, json.countries, json.recent);
-      })
-      .catch(function (err) { setStatus($('visits-status'), err.message, false); });
+    function loadVisitStats() {
+      return api('visits-stats')
+        .then(function (json) {
+          renderVisits(json.stats, json.countries, json.recent, json.topPages);
+          renderDashboard(siteData ? siteData.apps : [], json);
+          return json;
+        })
+        .catch(function (err) {
+          setStatus($('visits-status'), err.message, false);
+          setStatus($('dash-status'), err.message, false);
+          return null;
+        });
+    }
+    loadVisitStats();
+
+    var btnDashRefresh = $('btn-dash-refresh');
+    if (btnDashRefresh) {
+      btnDashRefresh.addEventListener('click', function () {
+        setStatus($('dash-status'), 'Refreshing…');
+        api('list')
+          .then(function (json) {
+            siteData = json;
+            renderApps(json.apps);
+            renderPolicies(json.apps, json.policies || {});
+            renderChecklist(json);
+            renderAudit(json.audit || []);
+            renderAuditEntries(json.audit || [], $('dash-activity'), 6);
+            loadVisitStats();
+            setStatus($('dash-status'), 'Refreshed.', true);
+          })
+          .catch(function (err) { setStatus($('dash-status'), err.message, false); });
+      });
+    }
+
+    Array.prototype.slice.call(document.querySelectorAll('.quick-actions [data-quick]')).forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var act = btn.getAttribute('data-quick');
+        if (act === 'new-app') { openNewEditor(); }
+        else if (act === 'analytics') { switchView('analytics'); refreshAnalytics(); }
+        else { switchView(act); }
+      });
+    });
+
+    /* --------------------------- analytics screens ------------------------- */
+    Array.prototype.slice.call(document.querySelectorAll('.range-group')).forEach(function (group) {
+      var key = group.getAttribute('data-range-for');
+      Array.prototype.slice.call(group.querySelectorAll('.range-btn')).forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          analyticsRanges[key] = btn.getAttribute('data-range');
+          refreshAnalytics();
+        });
+      });
+    });
+    var ipSearch = $('ip-search');
+    if (ipSearch) {
+      ipSearch.addEventListener('input', function () {
+        ipState.page = 1;
+        renderIpAnalysis(currentAnalytics('ips'));
+      });
+    }
+    var pagesSearch = $('pages-search');
+    if (pagesSearch) {
+      pagesSearch.addEventListener('input', function () { renderPages(currentAnalytics('pages')); });
+    }
 
     var btnVisitsExport = $('btn-visits-export');
     if (btnVisitsExport) {
@@ -471,8 +1004,8 @@
       btnVisitsClear.addEventListener('click', function () {
         if (!window.confirm('Remove all recorded visits? This cannot be undone.')) return;
         api('visits-clear')
-          .then(function (json) {
-            renderVisits(json, {}, []);
+          .then(function () {
+            loadVisitStats();
             setStatus($('visits-status'), 'Visit log cleared.', true);
           })
           .catch(function (err) { setStatus($('visits-status'), err.message, false); });
@@ -614,7 +1147,7 @@
     if (!siteData) return;
     var editor = $('policy-editor');
     editor.hidden = false;
-    editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    switchView('policy-edit');
     fillPolicySelect(id);
     var policy = (siteData.policies && siteData.policies[id]) || {};
     $('pol-status').value = String(policy.status || 'draft') === 'completed' ? 'completed' : 'draft';
@@ -693,6 +1226,7 @@
       var privacyLinked = !app.privacyUrl || String(app.privacyUrl).indexOf('app-privacy.html') !== -1;
       add(st.cls !== 'bad', '“' + name + '” has a written privacy policy', st.label + (app.privacyUrl ? ' · linked from the app: ' + String(app.privacyUrl) : ''));
       add(privacyLinked, '“' + name + '” privacyUrl points to the policy page', 'App editor → Privacy policy URL.');
+      add(!!app.termsUrl, '“' + name + '” has a Terms of Service URL', String(app.termsUrl || 'App editor → Terms of Service URL.'));
       add(!!app.playStoreUrl, '“' + name + '” has a Google Play listing URL', String(app.playStoreUrl || 'Added automatically after publishing.'));
       add(String(app.status || '').toLowerCase().indexOf('publish') !== -1, '“' + name + '” status is Published', String(app.status || '') + ' — set in the app editor.');
     });
@@ -704,7 +1238,7 @@
     if (!MT_LOGGED_IN) return;
 
     /* privacy policy editor */
-    $('btn-pol-close').addEventListener('click', function () { $('policy-editor').hidden = true; });
+    $('btn-pol-close').addEventListener('click', function () { $('policy-editor').hidden = true; switchView('policies'); });
 
     if ($('pol-app')) {
       $('pol-app').addEventListener('change', refreshPolicyUrl);
@@ -737,6 +1271,8 @@
           if (siteData) { siteData.policies = json.policies || siteData.policies; renderPolicies(siteData.apps, siteData.policies); renderChecklist(siteData); }
           $('pol-updated').textContent = new Date().toISOString().slice(0, 10);
           refreshPolicyUrl();
+          $('policy-editor').hidden = true;
+          switchView('policies');
           setStatus($('pol-status-msg'), 'Policy saved — your Play Store link is ' + policyPublicUrl(id) + ' (use Copy URL to paste it into the Play Console).', true);
         })
         .catch(function (err) { setStatus($('pol-status-msg'), err.message, false); });
@@ -751,6 +1287,8 @@
           if (siteData) { siteData.policies = json.policies || {}; renderPolicies(siteData.apps, siteData.policies); renderChecklist(siteData); }
           $('pol-content').value = '';
           $('pol-updated').textContent = 'not saved yet';
+          $('policy-editor').hidden = true;
+          switchView('policies');
           setStatus($('pol-status-msg'), 'Saved policy removed.', true);
         })
         .catch(function (err) { setStatus($('pol-status-msg'), err.message, false); });
@@ -849,7 +1387,7 @@
     var users = siteData && siteData.users ? siteData.users : [];
     var target = id ? users.find(function (u) { return String(u.id) === String(id); }) : null;
     editor.hidden = false;
-    editor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    switchView('user-edit');
     $('usr-id').value = target ? String(target.id || '') : '';
     $('usr-name').value = target ? String(target.name || '') : '';
     $('usr-username').value = target ? String(target.username || '') : '';
@@ -867,14 +1405,17 @@
   }
 
   function renderAudit(entries) {
-    var el = $('audit-list');
+    renderAuditEntries(entries, $('audit-list'), 100);
+  }
+
+  function renderAuditEntries(entries, el, limit) {
     if (!el) return;
     if (!entries || !entries.length) {
       el.innerHTML = '<p class="muted">No activity yet. Every sign-in and saved change will appear here.</p>';
       return;
     }
     el.innerHTML = '<table class="audit-table"><thead><tr><th>When</th><th>User</th><th>Action</th><th>Details</th></tr></thead><tbody>' +
-      entries.slice(0, 100).map(function (e) {
+      entries.slice(0, limit || 100).map(function (e) {
         return '<tr>' +
           '<td>' + esc(String(e.d || '')) + '</td>' +
           '<td>' + esc(String(e.u || '')) + '</td>' +
@@ -889,11 +1430,11 @@
 
     /* change password */
     $('btn-change-pw').addEventListener('click', function () {
-      var card = $('pw-card');
-      card.hidden = !card.hidden;
-      if (!card.hidden) $('pw-current').focus();
+      lastView = currentView || 'dashboard';
+      switchView('pass');
+      $('pw-current').focus();
     });
-    $('btn-pw-cancel').addEventListener('click', function () { $('pw-card').hidden = true; });
+    $('btn-pw-cancel').addEventListener('click', function () { switchView(lastView || 'dashboard'); });
     $('pw-form').addEventListener('submit', function (e) {
       e.preventDefault();
       if ($('pw-new').value !== $('pw-new2').value) {
@@ -907,8 +1448,8 @@
         password2: encodeUTF8($('pw-new2').value)
       }).then(function (json) {
         ['pw-current', 'pw-new', 'pw-new2'].forEach(function (id) { $(id).value = ''; });
-        $('pw-card').hidden = true;
         if (json.audit) renderAudit(json.audit);
+        switchView(lastView || 'dashboard');
         setStatus($('pw-status-msg'), 'Password updated.', true);
       }).catch(function (err) { setStatus($('pw-status-msg'), err.message, false); });
     });
@@ -917,7 +1458,7 @@
     var btnNewUser = $('btn-new-user');
     if (!btnNewUser) return;
     btnNewUser.addEventListener('click', function () { openUserEditor(''); });
-    $('btn-user-cancel').addEventListener('click', function () { $('user-editor').hidden = true; });
+    $('btn-user-cancel').addEventListener('click', function () { $('user-editor').hidden = true; switchView('users'); });
     $('btn-user-delete').addEventListener('click', function () {
       var id = $('usr-id').value;
       if (!id) return;
@@ -929,6 +1470,7 @@
           renderUsers(json.users || []);
           if (json.audit) renderAudit(json.audit);
           $('user-editor').hidden = true;
+          switchView('users');
           setStatus($('users-status'), 'User deleted.', true);
         })
         .catch(function (err) { setStatus($('user-status-msg'), err.message, false); });
@@ -951,6 +1493,7 @@
           renderUsers(json.users || []);
           if (json.audit) renderAudit(json.audit);
           $('user-editor').hidden = true;
+          switchView('users');
           setStatus($('users-status'), 'User saved.', true);
         })
         .catch(function (err) { setStatus($('user-status-msg'), err.message, false); });
@@ -975,5 +1518,6 @@
   wireDashboard();
   wireStoreFeatures();
   wireAccountFeatures();
+  wireSidebar();
 })();
 

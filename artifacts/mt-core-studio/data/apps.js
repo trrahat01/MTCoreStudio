@@ -24,6 +24,10 @@
 //               When in progress, point it at the generated template instead:
 //               "app-privacy.html?id=daily-spark" - complete the policy on that
 //               page before each app launches (see app-privacy.html).
+//   termsUrl    link to the app's Terms of Service ("" until ready). Tip: in the
+//               /admin app editor you can paste one GitHub Pages link and it
+//               auto-fills both privacyUrl and termsUrl (e.g.
+//               https://mtcorestudio.github.io/daily-spark-privacy/).
 //
 // IMPORTANT: never invent ratings, download counts, reviews, user numbers,
 // revenue or statistics. Only publish information that has been verified.
@@ -52,6 +56,7 @@ export const apps = [
     packageName: "com.dailyspark.quotes",
     playStoreUrl: "",
     privacyUrl: "app-privacy.html?id=daily-spark",
+    termsUrl: "",
     status: "Status to be confirmed"
   },
   {
@@ -77,6 +82,7 @@ export const apps = [
     packageName: "com.nurseexampreparation.nursing",
     playStoreUrl: "",
     privacyUrl: "app-privacy.html?id=nursing-exam-preparation",
+    termsUrl: "",
     status: "Status to be confirmed"
   },
   {
@@ -102,6 +108,7 @@ export const apps = [
     packageName: "",
     playStoreUrl: "",
     privacyUrl: "app-privacy.html?id=shift-schedule",
+    termsUrl: "",
     status: "Status to be confirmed"
   }
 ];

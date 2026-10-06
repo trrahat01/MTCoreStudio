@@ -46,3 +46,11 @@ Options -Indexes
   RewriteEngine On
   RewriteRule "^(admin|administrator|dashboard|wp-admin|wp-login|wp-content|wordpress|joomla|cpanel|plesk|phpmyadmin|pma|login(\.php)?|signin|install|installer|setup)(/.*)?$" - [R=404,L]
 </IfModule>
+
+# App/status/policy data edited through the admin console must never be served
+# stale: force revalidation so a save is visible on the public site immediately.
+<IfModule mod_headers.c>
+  <FilesMatch "^(apps|posts|policies|site-config|changelog)\.js$|^main\.js$">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+</IfModule>

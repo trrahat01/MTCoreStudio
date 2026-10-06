@@ -176,7 +176,7 @@ function mt_set_password_hash(string $hash): bool
 
 const MT_ROLES = ['owner', 'editor', 'viewer'];
 const MT_EDITOR_ACTIONS = [
-    'save-app', 'delete-app', 'import-play', 'save-config', 'save-ads',
+    'save-app', 'delete-app', 'import-play', 'fetch-links', 'save-config', 'save-ads',
     'add-ads-line', 'save-policy', 'reset-policy', 'save-verification',
     'delete-verification', 'waitlist-clear',
 ];
@@ -469,7 +469,8 @@ function mt_normalize_app(array $app): array
 {
     $fields = [
         'id', 'name', 'category', 'platform', 'description', 'icon',
-        'packageName', 'playStoreUrl', 'privacyUrl', 'status',
+        'packageName', 'playStoreUrl', 'privacyUrl', 'termsUrl',
+        'policySourceUrl', 'status', 'updatedAt',
     ];
     $out = [];
     foreach ($fields as $field) {
@@ -515,7 +516,154 @@ function mt_write_apps(array $apps): bool
     return mt_write_module(array_values($apps), 'apps', 'apps.js');
 }
 
+/* ---------------------- auto-fill legal links (Privacy + Terms) ------------ */
+/* Fetches a public legal-pages page (e.g. a GitHub Pages site like            */
+/* https://mtcorestudio.github.io/daily-spark-privacy/) and finds the two      */
+/* links it links to: the Privacy Policy and the Terms of Service.             */
+
+function mt_absolute_url(string $scheme, string $host, string $baseDir, string $href): string
+{
+    $href = trim($href);
+    if ($href === '') {
+        return '';
+    }
+    if (preg_match('/^https?:\\/\\//i', $href) === 1) {
+        return $href;
+    }
+    if (stripos($href, '://') === 0 && strpos($href, '//') === 0) {
+        return $scheme . ':' . $href;
+    }
+    if ($href[0] === '/') {
+        return $scheme . '://' . $host . $href;
+    }
+    return $scheme . '://' . $host . $baseDir . $href;
+}
+
+function mt_fetch_legal_links(string $url): array
+{
+    $out = ['privacyUrl' => '', 'termsUrl' => ''];
+    $url = trim($url);
+    if ($url === '' || strlen($url) > 500 || preg_match('/^https?:\\/\\//i', $url) !== 1) {
+        return $out;
+    }
+    $ua = 'Mozilla/5.0 (compatible; MT-Core-Studio/1.0)';
+    $ctx = stream_context_create([
+        'http' => [
+            'timeout' => 15,
+            'max_redirects' => 3,
+            'header' => 'User-Agent: ' . $ua . "\r\n",
+        ],
+        'ssl' => ['verify_peer' => false],
+    ]);
+    $body = @file_get_contents($url, false, $ctx);
+    // Reject HTTP error pages (404 etc.): a dead source must never be treated
+    // as a legal page - the caller then warns instead of silently filling URLs.
+    if (is_string($body)) {
+        $status = 0;
+        foreach ($http_response_header ?? [] as $line) {
+            if (stripos((string) $line, 'HTTP/') === 0) {
+                $parts = explode(' ', (string) $line);
+                $status = (int) ($parts[1] ?? 0);
+            }
+        }
+        if ($status >= 400) {
+            $body = null;
+        }
+    }
+    if (!is_string($body)) {
+        if (function_exists('curl_init')) {
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_TIMEOUT => 15,
+                CURLOPT_FAILONERROR => true,
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_USERAGENT => $ua,
+            ]);
+            $body = curl_exec($ch);
+            // curl_close() is a no-op since PHP 8.0 and deprecated in 8.5
+            // (its notice would corrupt JSON responses) - let the GC free it.
+        }
+    }
+    if (!is_string($body) || $body === '') {
+        return $out;
+    }
+
+    $parts = parse_url($url);
+    $scheme = (string) ($parts['scheme'] ?? 'https');
+    $host = (string) ($parts['host'] ?? '');
+    $path = (string) ($parts['path'] ?? '/');
+    if ($host === '') {
+        return $out;
+    }
+    // Keep a non-default port so the resolved links point at the right origin.
+    $defaultPort = $scheme === 'https' ? 443 : 80;
+    if (isset($parts['port']) && (int) $parts['port'] !== $defaultPort) {
+        $host .= ':' . (int) $parts['port'];
+    }
+    // Directory of the page (used to resolve relative links).
+    $baseDir = preg_replace('/\\/[^\\/]*$/', '/', $path);
+    $baseDir = $baseDir === '' || $baseDir === null ? '/' : $baseDir;
+
+    $m = [];
+    preg_match_all('/<a[^>]+href\\s*=\\s*["\x27]([^"\x27#]+)["\x27][^>]*>(.*?)<\\/a>/is', $body, $m);
+    if (is_array($m) && count($m) >= 2 && is_array($m[1])) {
+        $n = count($m[1]);
+        for ($i = 0; $i < $n; $i++) {
+            $href = (string) ($m[1][$i] ?? '');
+            $text = (string) ($m[2][$i] ?? '');
+            $abs = mt_absolute_url($scheme, $host, $baseDir, $href);
+            if ($abs === '') {
+                continue;
+            }
+            $hay = strtolower($href . ' ' . $text . ' ' . $abs);
+            if ($out['termsUrl'] === '' && stripos($hay, 'terms') !== false) {
+                $out['termsUrl'] = $abs;
+            } elseif ($out['privacyUrl'] === '' && stripos($hay, 'privacy') !== false) {
+                $out['privacyUrl'] = $abs;
+            }
+            if ($out['privacyUrl'] !== '' && $out['termsUrl'] !== '') {
+                break;
+            }
+        }
+    }
+    // If the page is itself the privacy policy (no separate privacy link), the
+    // pasted URL is the Privacy Policy URL.
+    if ($out['privacyUrl'] === '') {
+        $out['privacyUrl'] = preg_replace('/#.*$/', '', $url);
+    }
+    return $out;
+}
+
 /* ----------------------------- visits helpers ----------------------------- */
+/* Only a salted, one-way HMAC hash of each visitor's IP is stored - never the
+ * raw IP - so "new vs returning" and "top pages" can be measured without
+ * keeping personal data. The salt lives in meher/.visit-secret (not readable
+ * over the web thanks to meher/.htaccess).                                      */
+
+function mt_visit_secret(): string
+{
+    $path = MT_ADMIN_DIR . '/.visit-secret';
+    if (is_file($path)) {
+        $existing = trim((string) file_get_contents($path));
+        if ($existing !== '') {
+            return $existing;
+        }
+    }
+    $secret = bin2hex(random_bytes(16));
+    @file_put_contents($path, $secret);
+    return $secret;
+}
+
+function mt_hash_ip(string $ip): string
+{
+    $ip = trim($ip);
+    if ($ip === '') {
+        return '';
+    }
+    return substr(bin2hex(hash_hmac('sha256', $ip, mt_visit_secret())), 0, 16);
+}
 
 function mt_read_visits(): array
 {
@@ -527,7 +675,7 @@ function mt_write_visits(array $entries): bool
     return mt_write_module(array_values($entries), 'visits', 'visits.js');
 }
 
-function mt_record_visit(string $page, string $country): void
+function mt_record_visit(string $page, string $country, string $ip): void
 {
     $entries = mt_read_visits();
     $now = time();
@@ -536,6 +684,7 @@ function mt_record_visit(string $page, string $country): void
         'd' => date('Y-m-d', $now),
         'p' => $page,
         'c' => $country,
+        'h' => mt_hash_ip($ip),
     ];
     // Keep the anonymised log bounded: last 120 days and at most 10,000 rows.
     $cutoff = $now - 120 * 86400;
@@ -554,8 +703,13 @@ function mt_visit_stats(): array
     $weekAgo = strtotime('-7 days 00:00:00');
     $monthAgo = strtotime('-30 days 00:00:00');
 
-    $stats = ['today' => 0, 'yesterday' => 0, 'week' => 0, 'month' => 0, 'total' => count($visits)];
+    $stats = [
+        'today' => 0, 'yesterday' => 0, 'week' => 0, 'month' => 0, 'total' => count($visits),
+        'unique' => 0, 'newMembers' => 0, 'returning' => 0,
+    ];
     $countries = [];
+    $pages = [];
+    $visited = [];
     foreach ($visits as $v) {
         $day = (string) ($v['d'] ?? '');
         $t = (int) ($v['t'] ?? 0);
@@ -574,12 +728,223 @@ function mt_visit_stats(): array
         $code = strtoupper(mt_clean_text($v['c'] ?? '', 8));
         $key = $code !== '' ? $code : '??';
         $countries[$key] = ($countries[$key] ?? 0) + 1;
+
+        $p = (string) ($v['p'] ?? '');
+        if ($p !== '') {
+            $pages[$p] = ($pages[$p] ?? 0) + 1;
+        }
+
+        $h = mt_clean_text($v['h'] ?? '', 40);
+        if ($h !== '') {
+            if (isset($visited[$h])) {
+                $stats['returning']++;
+            } else {
+                $visited[$h] = true;
+                $stats['newMembers']++;
+                $stats['unique']++;
+            }
+        }
     }
     arsort($countries);
+    arsort($pages);
+    $topPages = [];
+    foreach ($pages as $i => $cnt) {
+        $topPages[] = ['page' => (string) $i, 'count' => (int) $cnt];
+        if (count($topPages) >= 10) {
+            break;
+        }
+    }
     return [
         'stats' => $stats,
         'countries' => $countries,
+        'topPages' => $topPages,
         'recent' => array_slice(array_reverse($visits), 0, 8),
+    ];
+}
+
+/* ----------------------------- ranged analytics ---------------------------- */
+/* Powers Analytics -> Overview / IP Analysis / Most Visited Pages.            */
+/* Works only from the anonymised log (salted IP hash + page + date + country):*/
+/*   $range = "today" | "7" | "30" | "all".                                   */
+/* Definitions for the IP summary cards:                                      */
+/*   newIps        first-ever appearance falls inside the selected range       */
+/*   returningIps  the hash was already in the log BEFORE the range started    */
+/*   repeatedIps   two or more visits inside the range                         */
+/* Raw IPs are never stored or returned - only 12-char hash prefixes.         */
+
+function mt_analytics(string $range): array
+{
+    if (!in_array($range, ['today', '7', '30', 'all'], true)) {
+        $range = '30';
+    }
+    $visits = mt_read_visits();
+
+    $from = null;
+    if ($range === 'today') {
+        $from = strtotime('today 00:00:00');
+    } elseif ($range === '7') {
+        $from = strtotime('-7 days 00:00:00');
+    } elseif ($range === '30') {
+        $from = strtotime('-30 days 00:00:00');
+    }
+    $weekFrom = strtotime('-7 days 00:00:00');
+    $monthFrom = strtotime('-30 days 00:00:00');
+    $today = date('Y-m-d');
+    $yesterday = date('Y-m-d', strtotime('-1 day'));
+
+    // First-ever appearance of every visitor hash across the whole log.
+    $firstEver = [];
+    foreach ($visits as $v) {
+        $h = (string) ($v['h'] ?? '');
+        $t = (int) ($v['t'] ?? 0);
+        if ($h === '' || $t <= 0) {
+            continue;
+        }
+        if (!isset($firstEver[$h]) || $t < $firstEver[$h]) {
+            $firstEver[$h] = $t;
+        }
+    }
+
+    $stats = [
+        'range' => $range,
+        'total' => count($visits),
+        'today' => 0, 'yesterday' => 0, 'week' => 0, 'month' => 0,
+        'visits' => 0, 'unique' => 0, 'newIps' => 0, 'returningIps' => 0, 'repeatedIps' => 0,
+    ];
+    $ipAgg = [];
+    $pages = [];
+    $countries = [];
+    $trend = [];
+
+    foreach ($visits as $v) {
+        $t = (int) ($v['t'] ?? 0);
+        $d = (string) ($v['d'] ?? '');
+        $p = (string) ($v['p'] ?? '');
+        $c = strtoupper(mt_clean_text($v['c'] ?? '', 8));
+        $key = $c !== '' ? $c : '??';
+
+        if ($d === $today) {
+            $stats['today']++;
+        }
+        if ($d === $yesterday) {
+            $stats['yesterday']++;
+        }
+        if ($t >= $weekFrom) {
+            $stats['week']++;
+        }
+        if ($t >= $monthFrom) {
+            $stats['month']++;
+        }
+
+        if ($from !== null && $t < $from) {
+            continue;
+        }
+
+        $stats['visits']++;
+        $countries[$key] = ($countries[$key] ?? 0) + 1;
+        if ($d !== '') {
+            $trend[$d] = ($trend[$d] ?? 0) + 1;
+        }
+        $h = (string) ($v['h'] ?? '');
+        if ($p !== '') {
+            if (!isset($pages[$p])) {
+                $pages[$p] = ['views' => 0, 'visitors' => []];
+            }
+            $pages[$p]['views']++;
+            if ($h !== '') {
+                $pages[$p]['visitors'][$h] = 1;
+            }
+        }
+        if ($h !== '') {
+            if (!isset($ipAgg[$h])) {
+                $ipAgg[$h] = ['visits' => 0, 'first' => $t, 'last' => $t];
+            }
+            $ipAgg[$h]['visits']++;
+            if ($t < $ipAgg[$h]['first']) {
+                $ipAgg[$h]['first'] = $t;
+            }
+            if ($t > $ipAgg[$h]['last']) {
+                $ipAgg[$h]['last'] = $t;
+            }
+        }
+    }
+
+    // Classify every visitor hash for the selected range.
+    $stats['unique'] = count($ipAgg);
+    $ips = [];
+    foreach ($ipAgg as $h => $row) {
+        $fe = $firstEver[$h] ?? $row['first'];
+        $isNew = $from === null || $fe >= $from;
+        if ($isNew) {
+            $stats['newIps']++;
+        } else {
+            $stats['returningIps']++;
+        }
+        if ($row['visits'] >= 2) {
+            $stats['repeatedIps']++;
+        }
+        // NOTE: (string) cast — PHP turns all-digit hash keys into ints.
+        $ips[] = [
+            'id' => substr((string) $h, 0, 12),
+            'visits' => $row['visits'],
+            'first' => date('Y-m-d H:i', $row['first']),
+            'last' => date('Y-m-d H:i', $row['last']),
+            'isNew' => $isNew,
+        ];
+    }
+    usort($ips, static function (array $a, array $b): int {
+        return $b['visits'] <=> $a['visits'];
+    });
+    $ips = array_slice($ips, 0, 1000);
+
+    // Pages sorted by views with per-page unique visitors + average visits.
+    $pageRows = [];
+    foreach ($pages as $path => $row) {
+        $unique = count($row['visitors']);
+        $pageRows[] = [
+            'page' => $path,
+            'views' => $row['views'],
+            'unique' => $unique,
+            'avg' => $unique > 0 ? round($row['views'] / $unique, 1) : (float) $row['views'],
+        ];
+    }
+    usort($pageRows, static function (array $a, array $b): int {
+        return $b['views'] <=> $a['views'];
+    });
+    $pageRows = array_slice($pageRows, 0, 50);
+
+    arsort($countries);
+
+    // Daily trend with zero-filled days so the chart lines up (max 90 bars).
+    $start = $from;
+    if ($start === null) {
+        $oldest = null;
+        foreach ($trend as $day => $n) {
+            $ts = strtotime($day . ' 00:00:00');
+            if ($ts !== false && ($oldest === null || $ts < $oldest)) {
+                $oldest = $ts;
+            }
+        }
+        $start = $oldest !== null ? max($oldest, strtotime('-90 days 00:00:00')) : strtotime('today 00:00:00');
+    }
+    $trendRows = [];
+    if ($start !== false && $start !== null) {
+        for ($ts = $start; $ts <= time(); $ts += 86400) {
+            $day = date('Y-m-d', $ts);
+            $trendRows[] = ['d' => $day, 'n' => (int) ($trend[$day] ?? 0)];
+            if (count($trendRows) >= 90) {
+                break;
+            }
+        }
+    }
+
+    return [
+        'range' => $range,
+        'stats' => $stats,
+        'trend' => $trendRows,
+        'pages' => $pageRows,
+        'ips' => $ips,
+        'countries' => $countries,
     ];
 }
 
@@ -823,7 +1188,6 @@ function mt_http_get(string $url): ?string
         ]);
         $body = curl_exec($ch);
         $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
         if ($code === 200 && is_string($body) && $body !== '') {
             return $body;
         }
@@ -975,7 +1339,6 @@ function mt_download_image(string $url, string $dest): bool
             CURLOPT_SSL_VERIFYPEER => false,
         ]);
         $body = curl_exec($ch);
-        curl_close($ch);
     } else {
         $ctx = stream_context_create([
             'http' => ['timeout' => 20, 'header' => "User-Agent: $ua\r\n"],
