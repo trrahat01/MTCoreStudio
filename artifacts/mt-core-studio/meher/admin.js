@@ -1,4 +1,46 @@
 /* MT Core Studio — admin console logic (vanilla JS) */
+// Test comment for editor
+
+function wireTheme() {
+  // Theme wiring initialized
+  // Theme toggle button
+  const btn = document.createElement('button');
+  btn.className = 'btn btn-ghost btn-theme-toggle';
+  btn.setAttribute('aria-label', 'Toggle dark/light theme');
+  btn.innerHTML = '<span class="theme-icon">🌙</span>';
+  
+  const topbarActions = document.querySelector('.topbar-actions');
+  if (topbarActions) {
+    topbarActions.appendChild(btn);
+  }
+  
+  // Check saved theme or default to dark
+  const savedTheme = localStorage.getItem('mt-core-studio-theme');
+  const isDark = savedTheme === 'light' ? false : savedTheme === 'dark' ? true : window.matchMedia('(prefers-color-scheme: dark)').matches;
+  
+  // Apply theme
+  if (!isDark) {
+    document.documentElement.setAttribute('data-theme', 'light');
+    btn.querySelector('.theme-icon').textContent = '☀️';
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+    btn.querySelector('.theme-icon').textContent = '🌙';
+  }
+  
+  // Toggle theme on click
+  btn.addEventListener('click', function () {
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+    if (isLight) {
+      document.documentElement.removeAttribute('data-theme');
+      localStorage.setItem('mt-core-studio-theme', 'dark');
+      btn.querySelector('.theme-icon').textContent = '🌙';
+    } else {
+      document.documentElement.setAttribute('data-theme', 'light');
+      localStorage.setItem('mt-core-studio-theme', 'light');
+      btn.querySelector('.theme-icon').textContent = '☀️';
+    }
+  });
+}
 (function () {
   'use strict';
 
@@ -1518,6 +1560,7 @@
   wireDashboard();
   wireStoreFeatures();
   wireAccountFeatures();
+  wireTheme();
   wireSidebar();
 })();
 

@@ -1,0 +1,14 @@
+### Requires the humao.rest-client extension and a configured, ignored .env file.
+POST {{$dotenv FREELLM_API_URL}}
+Authorization: Bearer {{$dotenv FREELLM_API_KEY}}
+Content-Type: application/json
+
+{
+  "model": "{{$dotenv FREELLM_MODEL}}",
+  "messages": [
+    { "role": "system", "content": "You are a concise coding assistant." },
+    { "role": "user", "content": "Explain why await is used inside async functions." }
+  ],
+  "temperature": 0.5,
+  "max_tokens": 200
+}

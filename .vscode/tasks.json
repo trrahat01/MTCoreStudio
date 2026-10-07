@@ -1,0 +1,29 @@
+{
+  "version": "2.0.0",
+  "inputs": [
+    {
+      "id": "freellmPrompt",
+      "type": "promptString",
+      "description": "What should the LLM answer?",
+      "default": "Explain the selected code"
+    }
+  ],
+  "tasks": [
+    {
+      "label": "Ask configured LLM",
+      "type": "process",
+      "command": "node",
+      "args": ["${workspaceFolder}/tools/ask-freellm.mjs", "${input:freellmPrompt}"],
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Try configured LLM demo",
+      "type": "process",
+      "command": "node",
+      "args": ["${workspaceFolder}/tools/freellm-demo.mjs"],
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": []
+    }
+  ]
+}
