@@ -1562,5 +1562,63 @@ function wireTheme() {
   wireAccountFeatures();
   wireTheme();
   wireSidebar();
+  function wireCommandPalette() {
+    var palette = document.createElement('div');
+    palette.id = 'command-palette';
+    palette.className = 'command-palette';
+    palette.innerHTML = '<div class=\"command-palette-backdrop\"></div><div class=\"command-palette-content\"><input type=\"text\" id=\"command-palette-input\" placeholder=\"Type a command...\" autocomplete=\"off\" /><div id=\"command-palette-list\"></div></div>';
+    document.body.appendChild(palette);
+    var backdrop = palette.querySelector('.command-palette-backdrop');
+    var input = palette.querySelector('#command-palette-input');
+    var listEl = palette.querySelector('#command-palette-list');
+    var actions = [
+      {label:'Dashboard',cb:function(){switchView('dashboard');}},
+      {label:'Apps',cb:function(){switchView('apps');}},
+      {label:'Store',cb:function(){switchView('store');}},
+      {label:'Policies',cb:function(){switchView('policies');}},
+      {label:'Analytics',cb:function(){switchView('analytics');}},
+      {label:'Waitlist',cb:function(){switchView('waitlist');}},
+      {label:'Users',cb:function(){switchView('users');}},
+      {label:'Settings',cb:function(){switchView('settings');}},
+      {label:'Ads',cb:function(){switchView('ads');}},
+      {label:'New App',cb:function(){openNewEditor();}},
+      {label:'Logout',cb:function(){api('logout').then(function(){location.reload();});}}
+    ];
+    function renderList(f){
+      var filt=f?actions.filter(function(a){return a.label.toLowerCase().indexOf(f.toLowerCase())!==-1}):actions;
+      listEl.innerHTML='';
+      filt.forEach(function(a,i){
+        var d=document.createElement('div');
+        d.className='command-palette-item';
+        if(i===0)d.classList.add('active');
+        d.textContent=a.label;
+        d.dataset.index=i;
+        listEl.appendChild(d);
+      });
+    }
+    function execute(){
+      var act=listEl.querySelector('.command-palette-item.active');
+      if(act){
+        var idx=parseInt(active.dataset.index,10);
+        if(!isNaN(idx)){actions[idx].cb();hidePalette();}
+      }
+    }
+    function show(){palette.classList.add('open');input.value='';renderList('');input.focus();}
+    function hide(){palette.classList.remove('open');}
+    document.addEventListener('keydown',function(e){if((e.ctrlKey||e.metaKey)&&e.key==='k'){e.preventDefault();show();}});
+    input.addEventListener('keydown',function(e){if(e.key==='Escape'){hide();}else if(e.key==='ArrowDown'){e.preventDefault();var act=listEl.querySelector('.command-palette-item.active');var nxt=act?act.nextElementSibling:listEl.firstChild;if(nxt){listEl.querySelectorAll('.command-palette-item').forEach(function(el){el.classList.remove('active');});nxt.classList.add('active');}}else if(e.key==='ArrowUp'){e.preventDefault();var act=listEl.querySelector('.command-palette-item.active');var prv=act?act.previousElementSibling:listEl.lastChild;if(prv){listEl.querySelectorAll('.command-palette-item').forEach(function(el){el.classList.remove('active');});prv.classList.add('active');}}else if(e.key==='Enter'){e.preventDefault();execute();}});
+    input.addEventListener('input',function(){renderList(input.value);var its=listEl.querySelectorAll('.command-palette-item');if(its.length){its.forEach(function(el){el.classList.remove('active');});its[0].classList.add('active');}});
+    listEl.addEventListener('click',function(e){if(e.target.classList.contains('command-palette-item')){var idx=parseInt(e.target.dataset.index,10);if(!isNaN(idx)){actions[idx].cb();hidePalette();}}});
+    backdrop.addEventListener('click',function(){hide();});
+  }
+  function showToast(message,type){
+    var con=document.getElementById('toast-container');
+    if(!con){con=document.createElement('div');con.id='toast-container';con.className='toast-container';document.body.appendChild(con);}
+    var t=document.createElement('div');
+    t.className='toast toast-'+type;
+    t.textContent=message;
+    con.appendChild(t);
+    setTimeout(function(){t.classList.add('fade-out');setTimeout(function(){con.removeChild(t);if(con.children.length===0){con.parentNode.removeChild(con);}},300);},3000);
+  }
 })();
 
