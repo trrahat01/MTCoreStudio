@@ -1005,8 +1005,8 @@ function mt_read_config(): array
     $base['brandName'] = (string) ($config['brandName'] ?? 'MT Core Studio');
     $base['tagline'] = (string) ($config['tagline'] ?? 'BUILD - INNOVATE - SIMPLIFY');
     $base['developerRole'] = (string) ($config['developerRole'] ?? 'Independent Android App Developer');
-    $base['websiteUrl'] = (string) ($config['websiteUrl'] ?? 'https://example.com');
-    $base['canonicalDomain'] = (string) ($config['canonicalDomain'] ?? 'https://example.com');
+    $base['websiteUrl'] = (string) ($config['websiteUrl'] ?? 'https://mtcorestudio.rf.gd');
+    $base['canonicalDomain'] = (string) ($config['canonicalDomain'] ?? 'https://mtcorestudio.rf.gd');
     $base['homeTitle'] = (string) ($config['homeTitle'] ?? '');
     $base['homeDescription'] = (string) ($config['homeDescription'] ?? '');
     return $base;

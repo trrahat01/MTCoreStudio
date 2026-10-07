@@ -5,6 +5,9 @@
 # Never list directory contents.
 Options -Indexes
 
+# Use the site's own accessible not-found page for unknown URLs.
+ErrorDocument 404 /404.html
+
 # Keep the server-managed data files out of direct browser reach.
 # These files are read/written by PHP (api/ and admin/) and are never
 # needed by the public pages, so their contents stay private.

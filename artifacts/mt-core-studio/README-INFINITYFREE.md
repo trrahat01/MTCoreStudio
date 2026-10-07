@@ -21,6 +21,7 @@ The top level of `public_html` must contain:
 
 ```
 index.html          Home
+404.html            Custom not-found page
 apps.html           App directory (search + filters)
 app.html            App details (works with ?id=...)
 about.html          About page
@@ -30,6 +31,7 @@ developer.html      Developer profile
 publisher.html      Publisher information
 contact.html        Contact page
 privacy.html        Privacy policy
+terms.html          Terms status and app-specific terms links
 blog.html           Studio notes
 robots.txt          Search engines
 sitemap.xml         Search engines
@@ -182,7 +184,7 @@ On most hosts, all pages sit at the root, so the existing
      `og:url` / `og:image` / `twitter:image` values
    - `robots.txt` → the `Sitemap:` line
    - `sitemap.xml` → the `https://example.com/...` URLs
-   For example replace `https://example.com` with `https://mtcorestudio.com`.
+   The current configuration uses `https://mtcorestudio.rf.gd`.
 4. Re-upload the updated files.
 
 ---
@@ -326,7 +328,7 @@ These ship with the current files - no extra setup needed beyond uploading:
   constant in `sw.js` after major redesigns (currently `mt-core-studio-v2` for
   the 2026 visual redesign — upload the new `sw.js` so returning visitors'
   browsers drop the old cached stylesheet).
-- **Design system.** `css/style.css` is one theme-token file:
+- **Design system.** `css/style.css` is the shared theme-token file:
 
   - **Dark mode (default):** deep navy/black with electric-blue + cyan accents,
     subtle tech grid, soft neon glow, glass cards.
@@ -334,8 +336,8 @@ These ship with the current files - no extra setup needed beyond uploading:
     white surface cards with hairline borders and soft blue-tinted shadows,
     a faint dot-grid texture and WCAG-friendly ink colours. It is *not* simply
     dark mode inverted.
-  - **Typography:** Space Grotesk (headings) + Inter (body) +
-    JetBrains Mono (labels/code). The font `<link>` lives in every `.html`
+  - **Typography:** Sora (headings) + DM Sans (body) +
+    IBM Plex Mono (labels/code). The font `<link>` lives in every `.html`
     head — update there if you ever change the stack.
   - **Theme toggle:** a sliding sun/moon pill in the navbar; the choice is
     saved to `localStorage` (`mt-core-studio-theme`) and applied before paint
@@ -343,15 +345,9 @@ These ship with the current files - no extra setup needed beyond uploading:
   - **Motion:** scroll-reveal uses `IntersectionObserver` (adds `data-reveal`
     elements), and both scroll reveal and all animations are disabled for
     users who set `prefers-reduced-motion`.
-  - **Live design layer (CSS + a few lines of JS):** slowly drifting ambient
-    aurora orbs, a rotating hero orbit, a breathing glow around the hero logo,
-    gradient-shimmer headline accents, a one-time shine sweep across cards and
-    buttons on hover, pulsing "live/brew" status dots, staggered scroll-reveal
-    for card grids, a thin gradient scroll-progress bar along the top, and a
-    soft gradient underline under the hero headline. All animation runs on
-    `transform`/`opacity`/`background-position` so it stays smooth on phones,
-    and the whole layer is disabled under `prefers-reduced-motion`. Orbs and
-    the progress bar are injected by `setupLiveEffects()` in `js/main.js`.
+  - **Motion:** restrained scroll-reveal, card/button hover states and a
+    pointer-following hero tint. The effect is CSS-led, avoids a continuous
+    animation loop, and respects `prefers-reduced-motion`.
 - **RSS feed.** `feed.xml` is linked from the blog page. After editing
   `data/posts.js`, regenerate it with `node tools/generate-feed.mjs`. The feed
   reads the configured `websiteUrl` from `data/site-config.js` automatically.

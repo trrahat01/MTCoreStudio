@@ -36,7 +36,7 @@ const posts = JSON.parse(jsonPart);
 
 /* ------------------------- find the configured domain ---------------------- */
 
-let websiteUrl = "https://example.com";
+let websiteUrl = "https://mtcorestudio.rf.gd";
 try {
   const rawConfig = readFileSync(configPath, "utf8");
   const m = rawConfig.match(/websiteUrl\s*:\s*["']([^"']+)["']/);

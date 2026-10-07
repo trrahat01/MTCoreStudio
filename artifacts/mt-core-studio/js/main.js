@@ -184,6 +184,7 @@ function header() {
     ["Home", "index.html", "home"],
     ["Apps", "apps.html", "apps"],
     ["About", "about.html", "about"],
+    ["Updates", "updates.html", "updates"],
     ["Blog", "blog.html", "blog"],
     ["Contact", "contact.html", "contact"]
   ];
@@ -242,7 +243,7 @@ function footer() {
         <a href="developer.html">Developer</a><a href="publisher.html">Publisher</a><a href="blog.html">Blog</a><a href="updates.html">Updates</a>
       </div></div>
       <div class="footer-col"><h2 class="footer-heading">Information</h2><div class="footer-links">
-        <a href="privacy.html">Privacy Policy</a><a href="contact.html">Contact</a><a href="sitemap.xml">Sitemap</a>
+        <a href="privacy.html">Privacy Policy</a><a href="terms.html">Terms</a><a href="contact.html">Contact</a><a href="sitemap.xml">Sitemap</a>
       </div></div>
       <div class="footer-col"><h2 class="footer-heading">Connect</h2><div class="footer-links">${socialLinks}</div></div>
     </div>
@@ -256,13 +257,13 @@ function footer() {
 function appCard(app) {
   const href = `app.html?id=${encodeURIComponent(app.id)}`;
   return `<article class="app-card">
-    <div class="app-card-top">${iconTile(app, 56)}<span class="category-pill">${escapeHTML(app.category)}</span></div>
+    <div class="app-card-top">${iconTile(app, 60)}<span class="category-pill">${escapeHTML(app.category)}</span></div>
     <h3 class="app-card-title"><a href="${href}">${escapeHTML(app.name)} <span aria-hidden="true">→</span></a></h3>
     <p class="app-card-desc">${escapeHTML(app.description || "Description to be added.")}</p>
     <div class="app-card-bottom">
       <span class="status-pill ${statusClass(app.status)}"><span class="status-dot" aria-hidden="true"></span>${escapeHTML(app.status || "Status to be confirmed")}</span>
-      <a class="card-link" href="${href}">View details <span aria-hidden="true">→</span></a>
     </div>
+    <div class="app-card-actions">${availableAction("Google Play", app.playStoreUrl)}<a class="card-link" href="${href}">Details <span aria-hidden="true">↗</span></a></div>
   </article>`;
 }
 
@@ -376,7 +377,7 @@ function purposeSection() {
   </div></section>`;
 }
 
-function homePage() {
+function legacyHomePage() {
   const heroPlay = cleanUrl(siteConfig.playStoreUrl)
     ? `<a class="button button-secondary button-google" href="${escapeHTML(cleanUrl(siteConfig.playStoreUrl))}" target="_blank" rel="noopener noreferrer">Google Play <span aria-hidden="true">↗</span></a>`
     : `<a class="button button-secondary" href="apps.html">View the collection <span aria-hidden="true">→</span></a>`;
@@ -439,6 +440,62 @@ function homePage() {
 }
 
 
+
+function homePage() {
+  const latestPosts = [...posts]
+    .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))
+    .slice(0, 2);
+
+  return `<section class="studio-hero">
+    <div class="studio-hero-grid wrap">
+      <div class="studio-hero-copy" data-reveal>
+        <span class="eyebrow"><span class="eyebrow-mark" aria-hidden="true"></span> INDEPENDENT SOFTWARE STUDIO</span>
+        <h1>Useful software,<br><span>thoughtfully built.</span></h1>
+        <p>MT Core Studio creates focused Android applications for everyday life — carefully designed, clearly useful, and built to stay out of your way.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="apps.html">Explore apps <span aria-hidden="true">↗</span></a>
+          <a class="button button-quiet" href="about.html">Meet the studio <span aria-hidden="true">→</span></a>
+        </div>
+        <div class="hero-meta"><span>BUILD <i>·</i> INNOVATE <i>·</i> SIMPLIFY</span><span>Independent Android development</span></div>
+      </div>
+      <div class="studio-hero-visual" data-reveal aria-label="MT Core Studio identity and current application">
+        <div class="hero-visual-grid" aria-hidden="true"></div>
+        <div class="hero-logo-panel"><img src="${logo}" alt="MT Core Studio — Build, Innovate, Simplify" width="1536" height="1024"></div>
+        <div class="hero-visual-caption"><span class="caption-line"></span><span>SOFTWARE WITH A CLEAR PURPOSE</span></div>
+        ${apps[0] ? `<a class="hero-product-chip" href="app.html?id=${encodeURIComponent(apps[0].id)}">${iconTile(apps[0], 42)}<span><small>IN THE STUDIO</small><strong>${escapeHTML(apps[0].name)}</strong></span><span class="chip-arrow" aria-hidden="true">↗</span></a>` : ""}
+      </div>
+    </div>
+    <a class="hero-scroll-cue" href="#studio-work"><span aria-hidden="true"></span> Explore the work</a>
+  </section>
+
+  <section class="section studio-work" id="studio-work"><div class="wrap">
+    <div class="section-head studio-section-head" data-reveal><div><span class="eyebrow">THE APPLICATIONS</span><h2>Small ideas. Built with care.</h2><p>Explore the current collection and see what each product is being made to do.</p></div><a class="text-link" href="apps.html">Browse all apps <span aria-hidden="true">↗</span></a></div>
+    <div class="app-grid" data-reveal>${apps.map(appCard).join("")}</div>
+  </div></section>
+
+  <section class="section studio-capabilities"><div class="wrap capabilities-layout">
+    <div class="capabilities-intro" data-reveal><span class="eyebrow">FROM FIRST QUESTION TO RELEASE</span><h2>One clear process.<br><span>One accountable builder.</span></h2><p>Every app moves through the same careful cycle: understand the need, shape a useful experience, build it for Android, test the details, then keep improving.</p><a class="text-link" href="developer.html">About the developer <span aria-hidden="true">↗</span></a></div>
+    <div class="capability-list" data-reveal>
+      <article><span>01</span><div><h3>Product direction</h3><p>Start with a real everyday need and a focused scope.</p></div><b aria-hidden="true">↗</b></article>
+      <article><span>02</span><div><h3>Interface design</h3><p>Make the important actions clear and comfortable to use.</p></div><b aria-hidden="true">↗</b></article>
+      <article><span>03</span><div><h3>Android development</h3><p>Build practical, lightweight applications for mobile devices.</p></div><b aria-hidden="true">↗</b></article>
+      <article><span>04</span><div><h3>Testing and iteration</h3><p>Check real flows, fix rough edges, and ship considered updates.</p></div><b aria-hidden="true">↗</b></article>
+    </div>
+  </div></section>
+
+  <section class="section studio-principles"><div class="wrap principles-layout" data-reveal>
+    <div><span class="eyebrow">THE STUDIO PRINCIPLE</span><h2>Build with intent.<br>Make it simpler.</h2></div>
+    <div class="principle-cards">
+      <article><span>01</span><h3>BUILD</h3><p>Create useful products for real routines.</p></article>
+      <article><span>02</span><h3>INNOVATE</h3><p>Use technology where it makes the experience better.</p></article>
+      <article><span>03</span><h3>SIMPLIFY</h3><p>Remove friction from everyday tasks.</p></article>
+    </div>
+  </div></section>
+
+  ${latestPosts.length ? `<section class="section studio-latest"><div class="wrap"><div class="section-head studio-section-head" data-reveal><div><span class="eyebrow">LATEST FROM THE STUDIO</span><h2>Notes on the work.</h2><p>Product notes and updates, shared as the projects take shape.</p></div><a class="text-link" href="blog.html">All studio notes <span aria-hidden="true">↗</span></a></div><div class="latest-grid" data-reveal>${latestPosts.map((post) => `<article class="latest-card"><span class="latest-meta">${escapeHTML(post.category || "Studio")} <i>·</i> ${escapeHTML(post.date || "")}</span><h3><a href="blog.html">${escapeHTML(post.title)}</a></h3><p>${escapeHTML(post.description || "")}</p><a class="text-link" href="blog.html">Read note <span aria-hidden="true">↗</span></a></article>`).join("")}</div></div></section>` : ""}
+
+  <section class="studio-final-cta"><div class="wrap final-cta-inner" data-reveal><div><span class="eyebrow">MT CORE STUDIO</span><h2>Have a useful idea<br>to talk through?</h2><p>Get in touch about the studio or explore the apps currently in development.</p></div><div class="hero-actions"><a class="button button-primary" href="contact.html">Contact the studio <span aria-hidden="true">↗</span></a><a class="button button-quiet" href="apps.html">Explore apps <span aria-hidden="true">→</span></a></div></div></section>`;
+}
 
 function appsPage() {
   return `<section class="page-intro"><div class="wrap">
@@ -1218,76 +1275,45 @@ function setupHeroCanvas() {
 }
 
 function setupMouseGlow() {
-  // The glow element is harmless when hidden (-2000px off-screen), so it is
-  // always created. Only the pointer listener is hover-gated (desktop only).
-  const hero = document.querySelector(".hero");
-  if (!hero) return;
-  const glow = document.createElement("span");
-  glow.className = "mouse-glow";
-  glow.setAttribute("aria-hidden", "true");
-  hero.appendChild(glow);
-
-  if (prefersReducedMotion()) return;
+  const hero = document.querySelector(".studio-hero");
+  if (!hero || prefersReducedMotion()) return;
   if (window.matchMedia && !window.matchMedia("(hover: hover)").matches) return;
-
-  let tx = -999;
-  let ty = -999;
-  let x = -999;
-  let y = -999;
-  let moving = false;
-
-  window.addEventListener(
-    "pointermove",
-    (event) => {
-      const rect = hero.getBoundingClientRect();
-      tx = event.clientX - rect.left;
-      ty = event.clientY - rect.top;
-      moving = true;
-    },
-    { passive: true }
-  );
-
-  const step = () => {
-    x += (tx - x) * 0.12;
-    y += (ty - y) * 0.12;
-    const scale = moving ? 1 : 0.4;
-    glow.style.transform = `translate(${x - 140}px, ${y - 140}px) scale(${scale})`;
-    requestAnimationFrame(step);
-  };
-  requestAnimationFrame(step);
+  hero.addEventListener("pointermove", (event) => {
+    const rect = hero.getBoundingClientRect();
+    hero.style.setProperty("--pointer-x", `${event.clientX - rect.left}px`);
+    hero.style.setProperty("--pointer-y", `${event.clientY - rect.top}px`);
+    hero.classList.add("has-pointer");
+  }, { passive: true });
+  hero.addEventListener("pointerleave", () => hero.classList.remove("has-pointer"), { passive: true });
 }
 
 function setupLiveEffects() {
-  // Ambient orbs (pure decoration, aria-hidden).
-  try {
-    const orbA = document.createElement("div");
-    orbA.className = "orb orb-a";
-    orbA.setAttribute("aria-hidden", "true");
-    const orbB = document.createElement("div");
-    orbB.className = "orb orb-b";
-    orbB.setAttribute("aria-hidden", "true");
-    document.body.appendChild(orbA);
-    document.body.appendChild(orbB);
-  } catch (e) { /* decorative only */ }
-
-  setupHeroCanvas();
   setupMouseGlow();
+}
 
-  // Scroll progress bar.
-  try {
-    const bar = document.createElement("div");
-    bar.className = "scroll-progress";
-    bar.setAttribute("aria-hidden", "true");
-    document.body.appendChild(bar);
-    const update = () => {
-      const max = document.documentElement.scrollHeight - window.innerHeight;
-      const pct = max > 0 ? (window.scrollY / max) * 100 : 0;
-      bar.style.width = `${Math.min(100, Math.max(0, pct))}%`;
-    };
-    update();
-    window.addEventListener("scroll", update, { passive: true });
-    window.addEventListener("resize", update);
-  } catch (e) { /* decorative only */ }
+function termsPage() {
+  return `<section class="page-intro legal-intro"><div class="wrap">
+    <span class="eyebrow">TERMS</span><h1>Terms of use</h1>
+    <p>App-specific terms are not published yet. This page will link to each product’s terms when they are ready.</p>
+  </div></section>
+  <section class="content-section"><div class="wrap legal-layout">
+    <article class="legal-card"><span class="eyebrow">CURRENT STATUS</span><h2>Terms are being prepared</h2>
+      <p>The MT Core Studio app collection is still in development. No app-specific terms have been supplied for publication, so this page does not present draft terms as final.</p>
+      <p>Before an app is published, its applicable terms will be linked from its details page and store listing.</p>
+      <p>For questions about the studio or its apps, visit the <a class="text-link" href="contact.html">contact page</a>.</p>
+    </article>
+    <aside class="legal-aside"><h2>Explore the collection</h2><p>See current app details and their published status.</p><a class="button button-primary" href="apps.html">Browse apps <span aria-hidden="true">↗</span></a></aside>
+  </div></section>`;
+}
+
+function notFoundPage() {
+  document.title = "Page not found | MT Core Studio";
+  document.querySelector('meta[name="robots"]')?.setAttribute("content", "noindex, follow");
+  return `<section class="not-found-page"><div class="wrap not-found-inner">
+    <span class="eyebrow">404 / PAGE NOT FOUND</span><p class="not-found-code" aria-hidden="true">404</p>
+    <h1>This page isn’t in the studio.</h1><p>The address may have changed, or the page may not exist. Find your way back to the current app collection.</p>
+    <div class="hero-actions"><a class="button button-primary" href="/index.html">Back to home <span aria-hidden="true">↗</span></a><a class="button button-quiet" href="/apps.html">Explore apps <span aria-hidden="true">→</span></a></div>
+  </div></section>`;
 }
 
 /* ---------------------------------- boot ---------------------------------- */
@@ -1301,6 +1327,8 @@ const renderers = {
   publisher: publisherPage,
   contact: contactPage,
   privacy: privacyPage,
+  terms: termsPage,
+  "404": notFoundPage,
   blog: blogPage,
   updates: updatesPage,
   "app-privacy": appPrivacyPage
@@ -1318,4 +1346,3 @@ setupHeaderState();
 setupLiveEffects();
 registerServiceWorker();
 trackVisit();
-

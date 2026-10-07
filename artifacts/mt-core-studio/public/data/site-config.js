@@ -20,7 +20,7 @@ export const siteConfig = {
 
   // Official public profile URLs. Only add links you own and verified.
   playStoreUrl: "", // Google Play developer page (https://play.google.com/store/apps/dev?id=...)
-  githubUrl: "",
+  githubUrl: "https://github.com/trrahat01/MTCoreStudio",
   youtubeUrl: "",
   facebookUrl: "",
   xUrl: "",
@@ -66,8 +66,8 @@ export const siteConfig = {
   // two values below AND update the canonical/og URLs in every HTML file,
   // robots.txt and sitemap.xml. See README-INFINITYFREE.md.
   // -------------------------------------------------------------------------
-  websiteUrl: "https://example.com",
-  canonicalDomain: "https://example.com",
+  websiteUrl: "https://mtcorestudio.rf.gd",
+  canonicalDomain: "https://mtcorestudio.rf.gd",
 
   // Homepage metadata (kept here so all pages can reference a single source)
   homeTitle: "MT Core Studio | Android Apps & Software Studio",

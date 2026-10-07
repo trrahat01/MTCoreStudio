@@ -182,7 +182,7 @@ On most hosts, all pages sit at the root, so the existing
      `og:url` / `og:image` / `twitter:image` values
    - `robots.txt` → the `Sitemap:` line
    - `sitemap.xml` → the `https://example.com/...` URLs
-   For example replace `https://example.com` with `https://mtcorestudio.com`.
+   The current configuration uses `https://mtcorestudio.rf.gd`.
 4. Re-upload the updated files.
 
 ---

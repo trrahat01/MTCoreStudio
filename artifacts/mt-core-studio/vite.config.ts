@@ -8,7 +8,7 @@ const basePath = process.env.BASE_PATH || '/mt-core-studio/';
 const pageNames = [
   'index', 'apps', 'app', 'about', 'developer',
   'publisher', 'contact', 'privacy', 'blog',
-  'updates', 'app-privacy',
+  'updates', 'app-privacy', 'terms', '404',
 ];
 
 export default defineConfig({
@@ -17,11 +17,18 @@ export default defineConfig({
   root,
   publicDir: path.resolve(root, 'public'),
   plugins: [{
-    name: 'copy-editable-content-data',
+    name: 'sync-static-deployment-files',
     closeBundle() {
-      cpSync(path.resolve(root, 'data'), path.resolve(root, 'dist/public/data'), {
-        recursive: true,
-      });
+      const output = path.resolve(root, 'dist/public');
+      // Keep the build deployable on the PHP host as well as locally: the
+      // editable site sources live beside the Vite config, outside public/.
+      for (const directory of ['assets', 'api', 'css', 'js', 'meher', 'tools']) {
+        cpSync(path.resolve(root, directory), path.resolve(output, directory), { recursive: true });
+      }
+      cpSync(path.resolve(root, 'data'), path.resolve(output, 'data'), { recursive: true });
+      for (const file of ['.htaccess', 'README-INFINITYFREE.md', 'app-ads.txt', 'feed.xml', 'robots.txt', 'sitemap.xml', 'site.webmanifest', 'sw.js']) {
+        cpSync(path.resolve(root, file), path.resolve(output, file));
+      }
     },
   }],
   build: {

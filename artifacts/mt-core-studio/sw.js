@@ -9,7 +9,7 @@
  * caches are replaced instead of lingering.
  * ------------------------------------------------------------------------- */
 
-const CACHE = "mt-core-studio-v4";
+const CACHE = "mt-core-studio-v5";
 const ROOT = "./";
 
 self.addEventListener("install", (event) => {
@@ -20,6 +20,8 @@ self.addEventListener("install", (event) => {
         cache.addAll([
           ROOT,
           "./index.html",
+          "./terms.html",
+          "./404.html",
           "./css/style.css",
           "./js/main.js",
           "./assets/images/mt-core-studio-logo.png",
