@@ -382,6 +382,7 @@ function homePage() {
     : `<a class="button button-secondary" href="apps.html">View the collection <span aria-hidden="true">→</span></a>`;
 
   return `<section class="hero"><div class="hero-bg" aria-hidden="true"><canvas class="hero-canvas" data-fx="particles"></canvas><span class="hero-beam"></span></div>
+// test change
   <div class="wrap hero-grid">
     <div class="reveal hero-lead">
       <span class="hero-chip">MT CORE STUDIO • APP DEVELOPMENT</span>
@@ -394,7 +395,12 @@ function homePage() {
     </div>
     <div class="hero-visual reveal reveal-delay" aria-label="MT Core Studio brand artwork">
       <div class="hero-orbit" aria-hidden="true"></div>
-      <div class="hero-logo-frame"><img src="${logo}" alt="MT Core Studio logo" width="1536" height="1024"></div>
+      <div class="hero-logo-frame"><div class="hero-phone-body">
+  <div class="hero-phone-screen">
+    ${apps.slice(0, 3).map(app => iconTile(app, 48)).join('')}
+    ${Array.from({length: 3}, (_, i) => iconTile({name: \`App \${i + 4}\`, icon: ''}, 48)).join('')}
+  </div>
+</div></div>
       <div class="visual-tag"><b>ONE DEVELOPER • ANDROID</b><span>Every app designed, built and shipped by me.</span></div>
     </div>
   </div></section>
