@@ -1,4 +1,5 @@
 <?php
+// Device stats tracking enabled
 require __DIR__ . '/config.php';
 mt_session_start();
 mt_security_headers();
@@ -319,6 +320,8 @@ $meName = $me ? (string) ($me['name'] ?? '') : '';
             <div class="row">
               <input type="url" id="f-policy-source" placeholder="https://mtcorestudio.github.io/daily-spark-privacy/" style="flex: 1; min-width: 240px;">
               <button class="btn btn-sm" type="button" id="btn-detect-legal">Detect links</button>
+              <button class="btn btn-sm" type="button" id="btn-sync-github">Sync from GitHub</button>
+              <input type="text" id="f-github-sync-url" placeholder="https://github.com/owner/repo" style="flex: 1; min-width: 240px;">
             </div>
             <p class="status" id="legal-status" role="status"></p>
           </div>
@@ -599,5 +602,15 @@ $meName = $me ? (string) ($me['name'] ?? '') : '';
   var MT_ROLE = <?php echo json_encode($role, JSON_UNESCAPED_SLASHES); ?>;
 </script>
 <script src="admin.js"></script>
+<section class="card" data-view="device-stats">
+  <div class="card-head">
+    <div><h2>Visitor Device Stats</h2><p>See what devices your visitors are using to access your site.</p></div>
+    <button class="btn" type="button" id="btn-refresh-device-stats">Refresh</button>
+  </div>
+  <div id="device-stats-content" class="device-stats-content">
+    <p class="status muted" id="device-stats-status">Loading stats...</p>
+  </div>
+</section>
+
 </body>
 </html>

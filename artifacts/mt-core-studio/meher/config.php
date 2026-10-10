@@ -543,6 +543,44 @@ function mt_fetch_legal_links(string $url): array
 {
     $out = ['privacyUrl' => '', 'termsUrl' => ''];
     $url = trim($url);
+    if ($url === '' || strlen($url) > 500 || preg_match('/^https?:\/\//i', $url) !== 1) {
+        return $out;
+    }
+
+    // Check if URL is a GitHub repository (e.g. https://github.com/owner/repo)
+    if (preg_match('#github\.com/([^/]+)/([^/#?]+)#i', $url, $gm)) {
+        $owner = $gm[1];
+        $repo = preg_replace('/\.git$/i', '', $gm[2]);
+        if ($owner !== '' && $repo !== '' && !in_array(strtolower($owner), ['features', 'topics', 'sponsors', 'settings', 'orgs'], true)) {
+            $branches = ['main', 'master'];
+            $privacyFiles = ['privacy-policy.md', 'privacy.md', 'PRIVACY.md', 'docs/privacy-policy.md', 'docs/privacy.md', 'privacy.html', 'docs/privacy.html'];
+            $termsFiles = ['terms.md', 'TERMS.md', 'terms-of-use.md', 'terms-of-service.md', 'docs/terms.md', 'docs/terms-of-use.md', 'docs/terms-of-service.md', 'terms.html', 'docs/terms.html'];
+
+            foreach ($branches as $branch) {
+                if ($out['privacyUrl'] === '') {
+                    foreach ($privacyFiles as $pf) {
+                        $rawUrl = "https://raw.githubusercontent.com/{$owner}/{$repo}/{$branch}/{$pf}";
+                        if (mt_http_get($rawUrl) !== null) {
+                            $out['privacyUrl'] = $rawUrl;
+                            break;
+                        }
+                    }
+                }
+                if ($out['termsUrl'] === '') {
+                    foreach ($termsFiles as $tf) {
+                        $rawUrl = "https://raw.githubusercontent.com/{$owner}/{$repo}/{$branch}/{$tf}";
+                        if (mt_http_get($rawUrl) !== null) {
+                            $out['termsUrl'] = $rawUrl;
+                            break;
+                        }
+                    }
+                }
+            }
+            if ($out['privacyUrl'] !== '' || $out['termsUrl'] !== '') {
+                return $out;
+            }
+        }
+    }
     if ($url === '' || strlen($url) > 500 || preg_match('/^https?:\\/\\//i', $url) !== 1) {
         return $out;
     }

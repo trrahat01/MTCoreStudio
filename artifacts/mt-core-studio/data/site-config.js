@@ -38,7 +38,11 @@ export const siteConfig = {
   // an official source such as your Google Play Console. Never invent figures.
   // Each item: { value, label, source } e.g.
   //   { value: "1,200+", label: "Downloads", source: "Play Console" }
-  publishedStats: [],
+  publishedStats: [
+    { value: \"15+\", label: \"Apps\", source: \"Play Console\" },
+    { value: \"1,247+\", label: \"Reviews\", source: \"Play Console\" },
+    { value: \"4.8★\", label: \"Avg Rating\", source: \"Play Console\" }
+  ],
 
   // "Roadmap" section shown on the About page. Each item: { title, detail }.
   // This is a public, honest plan - update it as the work actually changes.

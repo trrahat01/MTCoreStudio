@@ -1,5 +1,6 @@
 /* MT Core Studio — admin console logic (vanilla JS) */
 // Test comment for editor
+// Device stats tracking
 
 function wireTheme() {
   // Theme wiring initialized
@@ -890,6 +891,20 @@ function wireTheme() {
             setStatus($('legal-status'), 'Both links detected (' + notes.join(', ') + '). Review them, then press “Save app”.', true);
           }
         })
+
+    $('btn-sync-github').addEventListener('click', function () {
+      var url = $('f-github-sync-url').value.trim();
+      if (!url) { setStatus($('legal-status'), 'Enter the GitHub repository URL.', false); return; }
+      setStatus($('legal-status'), 'Syncing from GitHub…');
+      api('fetch-links', { url: url })
+        .then(function (json) {
+          if (json.privacyUrl) $('f-privacy-url').value = json.privacyUrl;
+          if (json.termsUrl) $('f-terms-url').value = json.termsUrl;
+          setStatus($('legal-status'), 'Sync successful.', true);
+        })
+        .catch(function (err) { setStatus($('legal-status'), err.message, false); });
+    });
+
         .catch(function (err) { setStatus($('legal-status'), err.message, false); });
     });
 
@@ -1582,6 +1597,98 @@ function wireTheme() {
       {label:'Settings',cb:function(){switchView('settings');}},
       {label:'Ads',cb:function(){switchView('ads');}},
       {label:'New App',cb:function(){openNewEditor();}},
+// Device Stats Functions
+function loadDeviceStats() {
+  var statusEl = $('device-stats-status');
+  var contentEl = $('device-stats-content');
+  if (!statusEl || !contentEl) return;
+
+  statusEl.textContent = 'Loading stats...';
+  statusEl.className = 'status muted';
+
+  fetch('/meher/stats.php')
+    .then(function(response) {
+      if (!response.ok) throw new Error('Network response was not ok');
+      return response.json();
+    })
+    .then(function(stats) {
+      if (!Array.isArray(stats) || stats.length === 0) {
+        contentEl.innerHTML = '<p class="status muted">No device stats available yet.</p>';
+        return;
+      }
+
+      // Calculate totals and breakdowns
+      var total = stats.length;
+      var deviceTypes = {};
+      var osTypes = {};
+      var browserTypes = {};
+
+      stats.forEach(function(stat) {
+        deviceTypes[stat.deviceType] = (deviceTypes[stat.deviceType] || 0) + 1;
+        osTypes[stat.os] = (osTypes[stat.os] || 0) + 1;
+        browserTypes[stat.browser] = (browserTypes[stat.browser] || 0) + 1;
+      });
+
+      // Format breakdown for display
+      function formatBreakdown(obj) {
+        return Object.entries(obj)
+          .map(function([key, value]) {
+            return '<span class="muted">' + key + ': ' + value + '</span>';
+          })
+          .join(' <span class="divider">|</span> ');
+      }
+
+      var html = '';
+      html += '<h3>Summary</h3>';
+      html += '<p><strong>Total visits:</strong> ' + total + '</p>';
+      html += '<p><strong>Device types:</strong> ' + formatBreakdown(deviceTypes) + '</p>';
+      html += '<p><strong>Operating systems:</strong> ' + formatBreakdown(osTypes) + '</p>';
+      html += '<p><strong>Browsers:</strong> ' + formatBreakdown(browserTypes) + '</p>';
+
+      // Recent visits (last 10)
+      html += '<h3>Recent Visits</h3>';
+      html += '<table class="stats-table"><thead><tr><th>Time</th><th>Device</th><th>OS</th><th>Browser</th></tr></thead><tbody>';
+      var recent = stats.slice(-10).reverse(); // Last 10, most recent first
+      recent.forEach(function(stat) {
+        var time = new Date(stat.timestamp).toLocaleString();
+        html += '<tr>';
+        html += '<td>' + time + '</td>';
+        html += '<td>' + stat.deviceType + '</td>';
+        html += '<td>' + stat.os + '</td>';
+        html += '<td>' + stat.browser + '</td>';
+        html += '</tr>';
+      });
+      html += '</tbody></table>';
+
+      contentEl.innerHTML = html;
+      statusEl.textContent = 'Stats updated';
+      statusEl.className = 'status success';
+    })
+    .catch(function(error) {
+      console.error('Error loading device stats:', error);
+      contentEl.innerHTML = '<p class="status error">Failed to load device stats.</p>';
+      statusEl.textContent = 'Error loading stats';
+      statusEl.className = 'status error';
+    });
+}
+
+// Initialize device stats on load
+document.addEventListener('DOMContentLoaded', function() {
+  // Only load stats if we're on the admin dashboard (device-stats view exists)
+  if ($('device-stats-content')) {
+    loadDeviceStats();
+  }
+
+  // Set up refresh button
+  var btnRefreshStats = $('btn-refresh-device-stats');
+  if (btnRefreshStats) {
+    btnRefreshStats.addEventListener('click', function () {
+      loadDeviceStats();
+    });
+  }
+});
+
+// Existing code continues...
       {label:'Logout',cb:function(){api('logout').then(function(){location.reload();});}}
     ];
     function renderList(f){
